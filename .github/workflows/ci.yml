@@ -26,14 +26,14 @@ jobs:
           - os: macOS-latest
             arch: aarch64
             version: '1'
-    # Stable, shared environment. NOTE: no JULIA_LOAD_PATH override needed.
     env:
       JULIA_DEPOT_PATH: ${{ github.workspace }}/.julia-depot
-      JULIA_PKG_USE_CLI_GIT: 'true'               # use system git, not LibGit2_jll
+      JULIA_LOAD_PATH: "@:@stdlib"                 # <-- ensure stdlib is always visible
+      JULIA_PKG_USE_CLI_GIT: 'true'
       JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
       JULIA_PKG_SERVER: https://pkg.julialang.org
       JULIA_PKG_PRECOMPILE_AUTO: '0'
-    continue-on-error: ${{ matrix.version == 'pre' }}   # prerelease can fail
+    continue-on-error: ${{ matrix.version == 'pre' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -44,7 +44,6 @@ jobs:
 
       - uses: julia-actions/cache@v2
 
-      # Warm up the default user env to avoid OpenSSL_jll/LibGit2_jll precompile failures
       - name: Bootstrap core JLLs
         shell: bash
         run: |
@@ -54,17 +53,12 @@ jobs:
             Pkg.Registry.update()
             for pkg in ("OpenSSL_jll","LibGit2_jll","LibSSH2_jll","MbedTLS_jll","LibCURL_jll")
               try
-                println("Installing ", pkg)
-                Pkg.add(pkg)
+                println("Installing ", pkg); Pkg.add(pkg)
               catch err
                 @warn("Could not install $pkg", err)
               end
             end
-            try
-              Pkg.precompile()
-            catch err
-              @warn("Bootstrap precompile failed", err)
-            end
+            try Pkg.precompile() catch err @warn("Bootstrap precompile failed", err) end
           '
 
       - name: Instantiate and precompile (project)
@@ -79,13 +73,11 @@ jobs:
           '
 
       - uses: julia-actions/julia-buildpkg@v1
-
       - uses: julia-actions/julia-runtest@v1
         with:
           coverage: true
 
       - uses: julia-actions/julia-processcoverage@v1
-
       - uses: codecov/codecov-action@v5
         with:
           file: lcov.info
@@ -94,6 +86,9 @@ jobs:
   CompatHelper:
     name: CompatHelper
     runs-on: ubuntu-latest
+    env:
+      JULIA_DEPOT_PATH: ${{ github.workspace }}/.julia-depot
+      JULIA_LOAD_PATH: "@:@stdlib"
     steps:
       - name: Pkg.add("CompatHelper")
         run: julia -e 'using Pkg; Pkg.add("CompatHelper")'
@@ -106,9 +101,10 @@ jobs:
     name: Documentation
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # needed for Documenter to push to gh-pages via GITHUB_TOKEN
+      contents: write
     env:
       JULIA_DEPOT_PATH: ${{ github.workspace }}/.julia-depot
+      JULIA_LOAD_PATH: "@:@stdlib"                 # <-- include stdlib for docs build too
       JULIA_PKG_USE_CLI_GIT: 'true'
       JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
       JULIA_PKG_SERVER: https://pkg.julialang.org
@@ -117,18 +113,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # Documenter likes full history for links/tags
-
+          fetch-depth: 0
       - uses: julia-actions/setup-julia@v2
         with:
-          version: '1.10'  # LTS/stable for docs
-
+          version: '1.10'
       - uses: julia-actions/cache@v2
         with:
           cache-registries: "true"
           cache-packages: "true"
           cache-artifacts: "true"
-
       - name: Install dependencies (docs env)
         run: |
           julia --project=docs/ --color=yes -e '
@@ -138,11 +131,10 @@ jobs:
             Pkg.instantiate()
             Pkg.precompile()
           '
-
       - name: Build and deploy
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # HTTPS deploy with built-in token
-          # DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # if you prefer SSH deploys
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
         run: julia --project=docs/ --color=yes docs/make.jl
 
   build:
@@ -150,6 +142,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JULIA_DEPOT_PATH: ${{ github.workspace }}/.julia-depot
+      JULIA_LOAD_PATH: "@:@stdlib"
       JULIA_PKG_USE_CLI_GIT: 'true'
       JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
       JULIA_PKG_SERVER: https://pkg.julialang.org
