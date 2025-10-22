@@ -5,30 +5,34 @@ on:
     branches: [master]
     tags: ["*"]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         version:
-          - '1.10'   # stable CI target (avoids 1.12 JLL precompile chain)
-          - 'pre'    # nightly/RC/beta; allowed to fail
+          - 'lts'   # or '1.10'
+          - 'pre'   # nightly/RC/beta; allowed to fail
         os:
           - ubuntu-latest
           - windows-latest
         arch:
           - x64
         include:
-          - os: macOS-latest
+          - os: macos-latest
             arch: aarch64
-            version: '1.10'
+            version: 'lts'
     env:
-      # Isolated, predictable environment
       JULIA_DEPOT_PATH: ${{ github.workspace }}/.julia-depot
-      JULIA_LOAD_PATH: "@:@stdlib"
       JULIA_PKG_USE_CLI_GIT: 'true'
       JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
       JULIA_PKG_SERVER: https://pkg.julialang.org
@@ -44,13 +48,17 @@ jobs:
           arch: ${{ matrix.arch }}
 
       - uses: julia-actions/cache@v2
+        with:
+          cache-registries: "true"
+          cache-packages: "true"
+          cache-artifacts: "true"
 
-      # Instantiate first in your project, before the actions try to build/test
       - name: Instantiate and precompile
         shell: bash
         run: |
           echo "Depot: $JULIA_DEPOT_PATH"
-          julia --project=. --color=yes -e '
+          julia --project=. --color=yes --startup-file=no -e '
+            empty!(Base.LOAD_PATH); push!(Base.LOAD_PATH, "@"); push!(Base.LOAD_PATH, "@stdlib")
             using Pkg
             Pkg.Registry.update()
             Pkg.instantiate()
@@ -58,33 +66,62 @@ jobs:
           '
 
       - uses: julia-actions/julia-buildpkg@v1
+
       - uses: julia-actions/julia-runtest@v1
 
       - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v5
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.version == '1.10'
+        uses: codecov/codecov-action@v5
         with:
-          file: lcov.info
+          files: lcov.info
+          fail_ci_if_error: false
+          verbose: true
+          # set use_oidc: true + permissions.id-token: write if you prefer OIDC auth (no token) per Codecov docs
           token: ${{ secrets.CODECOV_TOKEN }}
 
   CompatHelper:
     name: CompatHelper
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.10'
+
       - name: Pkg.add("CompatHelper")
-        run: julia -e 'using Pkg; Pkg.add("CompatHelper")'
+        shell: bash
+        run: julia --color=yes --startup-file=no -e '
+          empty!(Base.LOAD_PATH); push!(Base.LOAD_PATH, "@"); push!(Base.LOAD_PATH, "@stdlib")
+          using Pkg
+          Pkg.add(name="CompatHelper", uuid="aa819f21-2bde-4658-8897-bab36330d9b7", version="3")
+        '
+
       - name: CompatHelper.main()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: julia -e 'using CompatHelper; CompatHelper.main()'
+          # Optional but recommended if you use deploy keys:
+          # COMPATHELPER_PRIV: ${{ secrets.COMPATHELPER_PRIV }}
+        shell: bash
+        run: julia --color=yes --startup-file=no -e '
+          empty!(Base.LOAD_PATH); push!(Base.LOAD_PATH, "@"); push!(Base.LOAD_PATH, "@stdlib")
+          using CompatHelper; CompatHelper.main()
+        '
 
   docs:
     name: Documentation
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
     env:
       JULIA_DEPOT_PATH: ${{ github.workspace }}/.julia-depot
-      JULIA_LOAD_PATH: "@:@stdlib"
       JULIA_PKG_USE_CLI_GIT: 'true'
       JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
       JULIA_PKG_SERVER: https://pkg.julialang.org
@@ -105,8 +142,10 @@ jobs:
           cache-artifacts: "true"
 
       - name: Install dependencies (docs/)
+        shell: bash
         run: |
-          julia --project=docs/ --color=yes -e '
+          julia --project=docs/ --color=yes --startup-file=no -e '
+            empty!(Base.LOAD_PATH); push!(Base.LOAD_PATH, "@"); push!(Base.LOAD_PATH, "@stdlib")
             using Pkg
             Pkg.Registry.update()
             Pkg.develop(PackageSpec(path=pwd()))
@@ -117,22 +156,38 @@ jobs:
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: julia --project=docs/ --color=yes docs/make.jl
+          # DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # if using SSH deploy
+        shell: bash
+        run: |
+          julia --project=docs/ --color=yes --startup-file=no -e '
+            empty!(Base.LOAD_PATH); push!(Base.LOAD_PATH, "@"); push!(Base.LOAD_PATH, "@stdlib")
+            include("docs/make.jl")
+          '
 
   build:
     name: Formatter
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
     env:
       JULIA_DEPOT_PATH: ${{ github.workspace }}/.julia-depot
-      JULIA_LOAD_PATH: "@:@stdlib"
     steps:
       - uses: actions/checkout@v4
+
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.10'
+
       - name: Install JuliaFormatter and format
+        shell: bash
         run: |
-          julia --color=yes -e 'using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format(".")'
+          julia --color=yes --startup-file=no -e '
+            empty!(Base.LOAD_PATH); push!(Base.LOAD_PATH, "@"); push!(Base.LOAD_PATH, "@stdlib")
+            using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format(".")
+          '
+
       - name: Create Pull Request
         id: cpr
         uses: peter-evans/create-pull-request@v7
@@ -144,6 +199,7 @@ jobs:
           base: master
           delete-branch: true
           labels: formatting, automated pr, no changelog
+
       - name: Check outputs
         run: |
           echo "Pull Request Number - ${{ steps.cpr.outputs['pull-request-number'] }}"
