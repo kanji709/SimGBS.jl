@@ -160,15 +160,39 @@ jobs:
       JULIA_DEPOT_PATH: ${{ github.workspace }}/.julia-depot
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.10'
 
-      - name: Install JuliaFormatter and format
+      - name: Install JuliaFormatter
         shell: bash
         run: |
-          julia --color=yes --startup-file=no -e 'using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format(".")'
+          julia --color=yes --startup-file=no -e 'using Pkg; Pkg.add("JuliaFormatter")'
+
+      - name: Format tracked .jl files only (skip depot)
+        shell: bash
+        run: |
+          FILES="$(git ls-files '*.jl')"
+          if [ -z "$FILES" ]; then
+            echo "No .jl files to format"
+            exit 0
+          fi
+          # Pass the tracked files list to Julia via stdin
+          julia --color=yes --startup-file=no -e '
+            using JuliaFormatter
+            files = split(read(stdin, String), "\n")
+            for f in files
+              isempty(f) && continue
+              try
+                format(f)
+              catch e
+                @warn "Formatting failed" file=f error=e
+              end
+            end
+          ' <<< "$FILES"
 
       - name: Create Pull Request
         id: cpr
