@@ -32,20 +32,22 @@ jobs:
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
       - name: Instantiate and precompile dependencies
-        run: |
-          julia --color=yes -e '
-            using Pkg;
-            try
-              Pkg.Registry.update();
-              Pkg.instantiate();
-              Pkg.precompile();
-            catch e
-              @warn "Instantiation failed, retrying with registry refresh..." exception=(e, catch_backtrace())
-              Pkg.Registry.update();
-              Pkg.instantiate();
-              Pkg.precompile();
-            end
-          '
+         shell: bash
+         run: |
+         julia --color=yes -e '
+         using Pkg
+         Pkg.Registry.update()
+         Pkg.instantiate()
+         Pkg.precompile()
+         for pkg in ["MbedTLS_jll", "OpenSSL_jll", "LibGit2_jll", "LibCURL_jll"]
+           try
+              @eval using $(Symbol(pkg))
+           catch
+             println("⚙️ Rebuilding $pkg ...")
+             Pkg.build(pkg; verbose=true)
+             end
+             end
+             '
       # Build package (after all dependencies are in place)
       - uses: julia-actions/julia-buildpkg@v1
 
