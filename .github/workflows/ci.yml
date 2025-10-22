@@ -32,6 +32,7 @@ jobs:
       JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
       JULIA_PKG_SERVER: https://pkg.julialang.org
       JULIA_PKG_PRECOMPILE_AUTO: '0'
+      JULIA_LOAD_PATH: "@;@stdlib"      # ← ensure stdlib (e.g. Statistics) is visible
     continue-on-error: ${{ matrix.version == 'pre' }}
     steps:
       - uses: actions/checkout@v4
@@ -47,10 +48,10 @@ jobs:
         shell: bash
         run: |
           echo "⚙️ Bootstrapping into depot: $JULIA_DEPOT_PATH"
-          julia --color=yes -e '
+          julia --project=@v#.# --color=yes -e '
             using Pkg
             Pkg.Registry.update()
-            for pkg in ["OpenSSL_jll","LibGit2_jll","LibSSH2_jll","MbedTLS_jll","LibCURL_jll"]
+            for pkg in ("OpenSSL_jll","LibGit2_jll","LibSSH2_jll","MbedTLS_jll","LibCURL_jll")
               try
                 println("Installing ", pkg)
                 Pkg.add(pkg)
@@ -61,7 +62,7 @@ jobs:
             try
               Pkg.precompile()
             catch err
-              println("WARN: Precompile after JLL bootstrap failed (will retry): ", err)
+              println("WARN: Precompile in bootstrap failed: ", err)
             end
           '
 
