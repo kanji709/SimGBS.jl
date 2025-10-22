@@ -61,7 +61,16 @@ jobs:
             end
             Pkg.precompile()
           '
-
+      - name: Instantiate and precompile (CLI git bootstrap)
+        shell: bash
+        run: |
+          julia --color=yes -e '
+            using Pkg
+            println("🔧 Using CLI git? ", get(ENV, "JULIA_PKG_USE_CLI_GIT", ""))
+            Pkg.Registry.update()
+            Pkg.instantiate()
+            Pkg.precompile()
+          '
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
 
