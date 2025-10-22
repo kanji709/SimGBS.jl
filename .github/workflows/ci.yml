@@ -41,14 +41,24 @@ jobs:
 
       - uses: julia-actions/cache@v2
 
-      - name: Instantiate and precompile (CLI git bootstrap)
+      - name: Bootstrap core JLLs (fix OpenSSL_jll precompile)
         shell: bash
         run: |
+          echo "⚙️ Bootstrapping OpenSSL_jll and friends before Pkg loads..."
           julia --color=yes -e '
+            import Downloads
             using Pkg
-            println("🔧 Using CLI git? ", get(ENV, "JULIA_PKG_USE_CLI_GIT", ""))
             Pkg.Registry.update()
-            Pkg.instantiate()
+            # Manually add minimal JLLs that Pkg depends on
+            pkgs = ["OpenSSL_jll", "LibGit2_jll", "LibSSH2_jll", "MbedTLS_jll", "LibCURL_jll"]
+            for pkg in pkgs
+              try
+                println("Installing ", pkg)
+                Pkg.add(pkg)
+              catch err
+                @warn("Could not install $pkg", err)
+              end
+            end
             Pkg.precompile()
           '
 
