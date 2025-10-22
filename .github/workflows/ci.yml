@@ -21,7 +21,7 @@ jobs:
       matrix:
         version:
           - 'lts'   # or '1.10'
-          - 'pre'   # nightly/RC/beta; allowed to fail
+         # - 'pre'   # nightly/RC/beta; allowed to fail
         os:
           - ubuntu-latest
           - windows-latest
