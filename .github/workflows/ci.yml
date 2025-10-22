@@ -26,11 +26,14 @@ jobs:
           - os: macOS-latest
             arch: aarch64
             version: '1'
-    # Key env vars to avoid LibGit2_jll during bootstrap and make registry ops reliable
+    # Shared, stable bootstrap across steps
     env:
+      JULIA_DEPOT_PATH: ${{ runner.temp }}/julia-depot
       JULIA_PKG_USE_CLI_GIT: 'true'                     # use system git, not LibGit2_jll
       JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
       JULIA_PKG_SERVER: https://pkg.julialang.org
+      JULIA_PKG_PRECOMPILE_AUTO: '0'                    # avoid stdlib precompile races on fresh runners
+    continue-on-error: ${{ matrix.version == 'pre' }}   # prerelease can fail without breaking the job
     steps:
       - uses: actions/checkout@v4
 
@@ -41,26 +44,30 @@ jobs:
 
       - uses: julia-actions/cache@v2
 
+      # Phase 1: Ensure core JLLs exist BEFORE anything tries to precompile Pkg/LibGit2/Downloads
       - name: Bootstrap core JLLs (fix OpenSSL_jll precompile)
         shell: bash
         run: |
-          echo "⚙️ Bootstrapping OpenSSL_jll and friends before Pkg loads..."
+          echo "⚙️ Bootstrapping into depot: $JULIA_DEPOT_PATH"
           julia --color=yes -e '
-            import Downloads
             using Pkg
             Pkg.Registry.update()
-            # Manually add minimal JLLs that Pkg depends on
-            pkgs = ["OpenSSL_jll", "LibGit2_jll", "LibSSH2_jll", "MbedTLS_jll", "LibCURL_jll"]
-            for pkg in pkgs
+            for pkg in ["OpenSSL_jll","LibGit2_jll","LibSSH2_jll","MbedTLS_jll","LibCURL_jll"]
               try
                 println("Installing ", pkg)
                 Pkg.add(pkg)
               catch err
-                @warn("Could not install $pkg", err)
+                @warn("Could not install $pkg"; exception=(err, catch_backtrace()))
               end
             end
-            Pkg.precompile()
+            try
+              Pkg.precompile()
+            catch err
+              @warn("Precompile after JLL bootstrap failed (will retry)"; exception=(err, catch_backtrace()))
+            end
           '
+
+      # Phase 2: normal instantiate/precompile of your package
       - name: Instantiate and precompile (CLI git bootstrap)
         shell: bash
         run: |
@@ -71,20 +78,47 @@ jobs:
             Pkg.instantiate()
             Pkg.precompile()
           '
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
+
+      # Build & test in the same controlled environment (more reliable than the wrapper action on 1.12)
+      - name: Build
+        shell: bash
+        run: |
+          julia --color=yes -e '
+            using Pkg
+            try
+              Pkg.build(verbose=true)
+            catch e
+              @warn("Build failed once; retrying after registry refresh", e)
+              Pkg.Registry.update()
+              Pkg.instantiate()
+              Pkg.build(verbose=true)
+            end
+          '
+
+      - name: Run tests
+        shell: bash
+        run: |
+          julia --color=yes -e '
+            using Pkg
+            Pkg.test(; coverage=true)
+          '
 
       - uses: julia-actions/julia-processcoverage@v1
+
       - uses: codecov/codecov-action@v5
         with:
           file: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
 
-    continue-on-error: ${{ matrix.version == 'pre' }}  # prerelease can fail without breaking the job
-
   CompatHelper:
     name: CompatHelper
     runs-on: ubuntu-latest
+    env:
+      JULIA_DEPOT_PATH: ${{ runner.temp }}/julia-depot
+      JULIA_PKG_USE_CLI_GIT: 'true'
+      JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
+      JULIA_PKG_SERVER: https://pkg.julialang.org
+      JULIA_PKG_PRECOMPILE_AUTO: '0'
     steps:
       - name: Pkg.add("CompatHelper")
         run: julia -e 'using Pkg; Pkg.add("CompatHelper")'
@@ -99,9 +133,11 @@ jobs:
     permissions:
       contents: write   # needed for Documenter to push to gh-pages via GITHUB_TOKEN
     env:
+      JULIA_DEPOT_PATH: ${{ runner.temp }}/julia-depot
       JULIA_PKG_USE_CLI_GIT: 'true'
       JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
       JULIA_PKG_SERVER: https://pkg.julialang.org
+      JULIA_PKG_PRECOMPILE_AUTO: '0'
       JULIA_NUM_THREADS: '2'
     steps:
       - uses: actions/checkout@v4
@@ -113,10 +149,18 @@ jobs:
           version: '1.10'  # LTS/stable for docs
 
       - uses: julia-actions/cache@v2
-        with:
-          cache-registries: "true"
-          cache-packages: "true"
-          cache-artifacts: "true"
+
+      # Tiny bootstrap to avoid rare hiccups on fresh runners
+      - name: Bootstrap core JLLs
+        run: |
+          julia --color=yes -e '
+            using Pkg
+            Pkg.Registry.update()
+            for pkg in ["OpenSSL_jll","LibGit2_jll","LibSSH2_jll","MbedTLS_jll","LibCURL_jll"]
+              try Pkg.add(pkg) catch; end
+            end
+            try Pkg.precompile() catch; end
+          '
 
       - name: Install dependencies (docs env)
         run: |
@@ -137,11 +181,37 @@ jobs:
   build:
     name: Formatter
     runs-on: ubuntu-latest
+    env:
+      JULIA_DEPOT_PATH: ${{ runner.temp }}/julia-depot
+      JULIA_PKG_USE_CLI_GIT: 'true'
+      JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
+      JULIA_PKG_SERVER: https://pkg.julialang.org
+      JULIA_PKG_PRECOMPILE_AUTO: '0'
     steps:
       - uses: actions/checkout@v4
-      - name: Install JuliaFormatter and format
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+
+      - uses: julia-actions/cache@v2
+
+      - name: Prepare env
         run: |
-          julia -e 'using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format(".")'
+          julia --color=yes -e '
+            using Pkg
+            Pkg.Registry.update()
+            Pkg.add("JuliaFormatter")
+            Pkg.precompile()
+          '
+
+      - name: Format
+        run: |
+          julia --color=yes -e '
+            using JuliaFormatter
+            format(".")
+          '
+
       - name: Create Pull Request
         id: cpr
         uses: peter-evans/create-pull-request@v7
@@ -153,6 +223,7 @@ jobs:
           base: master
           delete-branch: true
           labels: formatting, automated pr, no changelog
+
       - name: Check outputs
         run: |
           echo "Pull Request Number - ${{ steps.cpr.outputs['pull-request-number'] }}"
