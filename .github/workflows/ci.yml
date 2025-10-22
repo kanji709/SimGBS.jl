@@ -31,13 +31,36 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
+      - name: Instantiate and precompile dependencies
+        run: |
+          julia --color=yes -e '
+            using Pkg;
+            try
+              Pkg.Registry.update();
+              Pkg.instantiate();
+              Pkg.precompile();
+            catch e
+              @warn "Instantiation failed, retrying with registry refresh..." exception=(e, catch_backtrace())
+              Pkg.Registry.update();
+              Pkg.instantiate();
+              Pkg.precompile();
+            end
+          '
+      # Build package (after all dependencies are in place)
       - uses: julia-actions/julia-buildpkg@v1
+
+      # Run tests
       - uses: julia-actions/julia-runtest@v1
+
+      # Process coverage
       - uses: julia-actions/julia-processcoverage@v1
+
+      # Upload coverage to Codecov
       - uses: codecov/codecov-action@v5
         with:
           file: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
+          
   CompatHelper:
     name: CompatHelper
     runs-on: ubuntu-latest
@@ -56,7 +79,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@latest
         with:
-          version: '1.6'
+          version: '1.10'
       - name: Install dependencies
         run: julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
       - name: Build and deploy
@@ -64,6 +87,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
           #DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # If authenticating with SSH deploy key
         run: julia --project=docs/ docs/make.jl
+        
   build:
     name: Formatter
     runs-on: ubuntu-latest
