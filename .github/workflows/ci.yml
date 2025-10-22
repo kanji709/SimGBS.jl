@@ -97,22 +97,15 @@ jobs:
 
       - name: Pkg.add("CompatHelper")
         shell: bash
-        run: julia --color=yes --startup-file=no -e '
-          empty!(Base.LOAD_PATH); push!(Base.LOAD_PATH, "@"); push!(Base.LOAD_PATH, "@stdlib")
-          using Pkg
-          Pkg.add(name="CompatHelper", uuid="aa819f21-2bde-4658-8897-bab36330d9b7", version="3")
-        '
+        run: |
+          julia --color=yes --startup-file=no -e 'empty!(Base.LOAD_PATH); push!(Base.LOAD_PATH, "@"); push!(Base.LOAD_PATH, "@stdlib"); using Pkg; Pkg.add(name="CompatHelper", uuid="aa819f21-2bde-4658-8897-bab36330d9b7", version="3")'
 
       - name: CompatHelper.main()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Optional but recommended if you use deploy keys:
-          # COMPATHELPER_PRIV: ${{ secrets.COMPATHELPER_PRIV }}
         shell: bash
-        run: julia --color=yes --startup-file=no -e '
-          empty!(Base.LOAD_PATH); push!(Base.LOAD_PATH, "@"); push!(Base.LOAD_PATH, "@stdlib")
-          using CompatHelper; CompatHelper.main()
-        '
+        run: |
+          julia --color=yes --startup-file=no -e 'empty!(Base.LOAD_PATH); push!(Base.LOAD_PATH, "@"); push!(Base.LOAD_PATH, "@stdlib"); using CompatHelper; CompatHelper.main()'
 
   docs:
     name: Documentation
