@@ -55,8 +55,8 @@ jobs:
       - name: Remove stale manifests (avoid stdlib/version skew)
         shell: bash
         run: |
-          [ -f Manifest.toml ] && rm Manifest.toml
-          [ -f docs/Manifest.toml ] && rm docs/Manifest.toml
+          rm -f Manifest.toml
+          rm -f docs/Manifest.toml
 
       - name: Instantiate and precompile
         shell: bash
@@ -135,7 +135,7 @@ jobs:
       - name: Remove stale docs manifest
         shell: bash
         run: |
-          [ -f docs/Manifest.toml ] && rm docs/Manifest.toml
+          rm -f docs/Manifest.toml
 
       - name: Install dependencies (docs/)
         shell: bash
