@@ -40,7 +40,21 @@ jobs:
             Pkg.Registry.update()
             Pkg.instantiate()
             Pkg.precompile()
-            for pkg in ["MbedTLS_jll", "OpenSSL_jll", "LibGit2_jll", "LibCURL_jll"]
+
+            # Ensure core JLL packages are available for build
+            core_jlls = ["MbedTLS_jll", "OpenSSL_jll", "LibGit2_jll", "LibCURL_jll"]
+            for pkg in core_jlls
+              try
+                @eval using $(Symbol(pkg))
+              catch
+                println("⚙️ Installing missing $pkg ...")
+                Pkg.add(pkg)
+                Pkg.precompile()
+              end
+            end
+
+            # Try rebuilding after confirming installation
+            for pkg in core_jlls
               try
                 @eval using $(Symbol(pkg))
               catch
