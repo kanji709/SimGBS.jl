@@ -122,12 +122,12 @@ function digestGenome(
     if length(useChr) == 1
         global numChr = useChr[1] # useChr is considered to be # of chromosomes if an integer is supplied
         useChr = collect(1:useChr[1]) # select first n chromosomes
-        starts = (header.+1)[useChr] # subset genome
+        starts = (header .+ 1)[useChr] # subset genome
         ends = [header[2:end] .- 1; size(genome)[1]][useChr]
         println("INFO: Using chromsome $(useChr)!")
     elseif length(useChr) == length(header)
         global numChr = length(useChr) # useChr is considered to be a set of chromosomes if a vector is supplied
-        starts = (header.+1)[useChr] # select chromosomes (specified by [useChr])
+        starts = (header .+ 1)[useChr] # select chromosomes (specified by [useChr])
         ends = [header[2:end] .- 1; size(genome)[1]][useChr] # subset genome
         println("INFO: Using chromsome $(useChr) in the simulation!")
     else

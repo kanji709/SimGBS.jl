@@ -30,7 +30,7 @@ function sampleSNPPosition(totalSNP::Int64, winSize::Int64, mu::Float64, sigmasq
             # alpha = mu^2/sigmasq # calcualte Gamma paramter: shape
             density = exp.(rand(Laplace(mu, sigmasq), numWin)) # sample SNP density for each window
             win = fill(winSize, numWin) # generate a vector (with length = numWin) contating windown size for each window
-            winPos = [0; cumsum(win)[1:end-1]] # starting postion of each window
+            winPos = [0; cumsum(win)[1:(end-1)]] # starting postion of each window
             sam = [rand(Bernoulli(1.4 * density[i]), winSize) for i = 1:numWin] # sampling the occurence of SNP at each bp using local SNP density (sampled from Gamma model for each win)
             sam2 = map(x -> findall(x .> 0), sam) # record SNP positions within each window
             sam3 = reduce(vcat, [sam2[i] .+ winPos[i] for i = 1:numWin]) # calcualte SNP position within chromosome
@@ -52,7 +52,7 @@ function sampleAlleleFrequency(numLoci::Array{Int64}, mu::Float64, sigmasq::Floa
     af = Array{Float64}(undef, 0)
     for c = 1:size(numLoci, 1)
         tmp = rand(Beta(alpha, beta), numLoci[c] * 3)
-        af = [af; [tmp[(tmp.>0.05).&(tmp.<0.95)][1:numLoci[c]]]] # sample allele frequency from a Beta distribution
+        af = [af; [tmp[(tmp .> 0.05) .& (tmp .< 0.95)][1:numLoci[c]]]] # sample allele frequency from a Beta distribution
     end
     af
 end
@@ -159,12 +159,12 @@ function getHaplotypes(samples = ind)
     ends = totalSNP .+ 1
     haplotypes = Array{Int64}(undef, 2 * size(samples, 1), sum(numSNP) + 1)
     for i = 1:numInd
-        haplotypes[2*i-1:2*i, 1] .= samples[i].ID
+        haplotypes[(2*i-1):(2*i), 1] .= samples[i].ID
         for c = 1:numChr
             mat = samples[i].MatChrs[c].SNPs
             pat = samples[i].PatChrs[c].SNPs
-            haplotypes[collect(1:2:2*numInd)[i], starts[c]:ends[c]] = mat
-            haplotypes[collect(2:2:2*numInd)[i], starts[c]:ends[c]] = pat
+            haplotypes[collect(1:2:(2*numInd))[i], starts[c]:ends[c]] = mat
+            haplotypes[collect(2:2:(2*numInd))[i], starts[c]:ends[c]] = pat
         end
     end
     haplotypes
@@ -393,7 +393,7 @@ function GBS(
     totalDepth = Array{Int64}(undef, totalInd, totalFrag)
     ### 2.2 inster variants
     #### 2.2.1 subset haplotype alleel by chromosome
-    hapStart = [1; numSNP[1:end-1] .+ 1] .+ 1
+    hapStart = [1; numSNP[1:(end-1)] .+ 1] .+ 1
     hapEnd = cumsum(numSNP) .+ 1
     #### 2.2.2 genearte FASTQ file(s)
     flowcell = "ABC12AAXX" # flowcell name
