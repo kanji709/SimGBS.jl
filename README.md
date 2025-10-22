@@ -80,3 +80,4 @@ The following tools are recommended for downstream analyses of GBS data,
 - [**SMAP**](https://gitlab.com/truttink/smap): a software package that analyses read mapping distributions and performs haplotype calling to create multi-allelic molecular markers.
 
 
+
