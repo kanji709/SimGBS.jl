@@ -156,7 +156,7 @@ function digestGenome(
     lenFrag = Array{Int64}(undef, 0) # empty array to store the position
     if length(useChr) <= length(header)
         global numChr = length(useChr) # useChr is considered to be a set of chromosomes if a vector is supplied
-        starts = (header.+1)[useChr] # select chromosomes (specified by [useChr])
+        starts = (header .+ 1)[useChr] # select chromosomes (specified by [useChr])
         ends = [header[2:end] .- 1; size(genome)[1]][useChr] # subset genome
         println("INFO: Using chromsome $(useChr) in the simulation!")
     else
