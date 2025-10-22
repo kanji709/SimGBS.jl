@@ -14,9 +14,8 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1'      # latest stable 1.x (currently 1.10.x)
-          - 'lts'    # latest LTS alias
-          - 'pre'    # prerelease (RC/beta/alpha)
+          - '1.10'   # stable CI target (avoids 1.12 JLL precompile chain)
+          - 'pre'    # nightly/RC/beta; allowed to fail
         os:
           - ubuntu-latest
           - windows-latest
@@ -25,15 +24,17 @@ jobs:
         include:
           - os: macOS-latest
             arch: aarch64
-            version: '1'
+            version: '1.10'
     env:
+      # Isolated, predictable environment
       JULIA_DEPOT_PATH: ${{ github.workspace }}/.julia-depot
-      JULIA_LOAD_PATH: "@:@stdlib"                 # <-- ensure stdlib is always visible
+      JULIA_LOAD_PATH: "@:@stdlib"
       JULIA_PKG_USE_CLI_GIT: 'true'
       JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
       JULIA_PKG_SERVER: https://pkg.julialang.org
       JULIA_PKG_PRECOMPILE_AUTO: '0'
     continue-on-error: ${{ matrix.version == 'pre' }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -44,29 +45,13 @@ jobs:
 
       - uses: julia-actions/cache@v2
 
-      - name: Bootstrap core JLLs
+      # Instantiate first in your project, before the actions try to build/test
+      - name: Instantiate and precompile
         shell: bash
         run: |
-          echo "⚙️ Bootstrapping core JLLs into ${JULIA_DEPOT_PATH}"
-          julia --project=@v#.# --color=yes -e '
-            using Pkg
-            Pkg.Registry.update()
-            for pkg in ("OpenSSL_jll","LibGit2_jll","LibSSH2_jll","MbedTLS_jll","LibCURL_jll")
-              try
-                println("Installing ", pkg); Pkg.add(pkg)
-              catch err
-                @warn("Could not install $pkg", err)
-              end
-            end
-            try Pkg.precompile() catch err @warn("Bootstrap precompile failed", err) end
-          '
-
-      - name: Instantiate and precompile (project)
-        shell: bash
-        run: |
+          echo "Depot: $JULIA_DEPOT_PATH"
           julia --project=. --color=yes -e '
             using Pkg
-            println("🔧 Project: ", Pkg.project().path)
             Pkg.Registry.update()
             Pkg.instantiate()
             Pkg.precompile()
@@ -74,8 +59,6 @@ jobs:
 
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
-        with:
-          coverage: true
 
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v5
@@ -86,9 +69,6 @@ jobs:
   CompatHelper:
     name: CompatHelper
     runs-on: ubuntu-latest
-    env:
-      JULIA_DEPOT_PATH: ${{ github.workspace }}/.julia-depot
-      JULIA_LOAD_PATH: "@:@stdlib"
     steps:
       - name: Pkg.add("CompatHelper")
         run: julia -e 'using Pkg; Pkg.add("CompatHelper")'
@@ -104,25 +84,27 @@ jobs:
       contents: write
     env:
       JULIA_DEPOT_PATH: ${{ github.workspace }}/.julia-depot
-      JULIA_LOAD_PATH: "@:@stdlib"                 # <-- include stdlib for docs build too
+      JULIA_LOAD_PATH: "@:@stdlib"
       JULIA_PKG_USE_CLI_GIT: 'true'
       JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
       JULIA_PKG_SERVER: https://pkg.julialang.org
-      JULIA_PKG_PRECOMPILE_AUTO: '0'
       JULIA_NUM_THREADS: '2'
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.10'
+
       - uses: julia-actions/cache@v2
         with:
           cache-registries: "true"
           cache-packages: "true"
           cache-artifacts: "true"
-      - name: Install dependencies (docs env)
+
+      - name: Install dependencies (docs/)
         run: |
           julia --project=docs/ --color=yes -e '
             using Pkg
@@ -131,10 +113,10 @@ jobs:
             Pkg.instantiate()
             Pkg.precompile()
           '
+
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
         run: julia --project=docs/ --color=yes docs/make.jl
 
   build:
@@ -143,15 +125,14 @@ jobs:
     env:
       JULIA_DEPOT_PATH: ${{ github.workspace }}/.julia-depot
       JULIA_LOAD_PATH: "@:@stdlib"
-      JULIA_PKG_USE_CLI_GIT: 'true'
-      JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
-      JULIA_PKG_SERVER: https://pkg.julialang.org
-      JULIA_PKG_PRECOMPILE_AUTO: '0'
     steps:
       - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.10'
       - name: Install JuliaFormatter and format
         run: |
-          julia -e 'using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format(".")'
+          julia --color=yes -e 'using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format(".")'
       - name: Create Pull Request
         id: cpr
         uses: peter-evans/create-pull-request@v7
