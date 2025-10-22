@@ -7,7 +7,6 @@
 [![Build Status](https://github.com/kanji709/SimGBS.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/kanji709/SimGBS.jl/actions/workflows/ci.yml)
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/kanji709/SimGBS.jl?color=purple&style=flat-square)
 [![GitHub issues](https://img.shields.io/github/issues/AgResearch/snpGBS)](https://github.com/kanji709/SimGBS.jl/issues)
-[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fkanji709%2FSimGBS.jl&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=true)](https://hits.seeyoufarm.com)
 [![GitHub license](https://img.shields.io/github/license/AgResearch/snpGBS?style=flat-square)](https://github.com/kanji709/SimGBS.jl/blob/master/LICENSE)
 
 
@@ -79,3 +78,4 @@ The following tools are recommended for downstream analyses of GBS data,
 - [**GUSLD**](https://github.com/AgResearch/GUS-LD): An R package for estimating linkage disequilibrium using low and/or high coverage sequencing data without requiring filtering with respect to read depth.
 
 - [**SMAP**](https://gitlab.com/truttink/smap) a software package that analyzes read mapping distributions and performs haplotype calling to create multi-allelic molecular markers.
+
