@@ -12,14 +12,20 @@ end
 
 @testset "Hooks for Core integration" begin
     @testset "whitespace parsing" begin
-        @test JuliaSyntax.core_parser_hook("", "somefile", 1, 0, :statement) == Core.svec(nothing, 0)
-        @test JuliaSyntax.core_parser_hook("", "somefile", 1, 0, :statement) == Core.svec(nothing, 0)
+        @test JuliaSyntax.core_parser_hook("", "somefile", 1, 0, :statement) ==
+              Core.svec(nothing, 0)
+        @test JuliaSyntax.core_parser_hook("", "somefile", 1, 0, :statement) ==
+              Core.svec(nothing, 0)
 
-        @test JuliaSyntax.core_parser_hook("  ", "somefile", 1, 2, :statement) == Core.svec(nothing,2)
-        @test JuliaSyntax.core_parser_hook(" #==# ", "somefile", 1, 6, :statement) == Core.svec(nothing,6)
+        @test JuliaSyntax.core_parser_hook("  ", "somefile", 1, 2, :statement) ==
+              Core.svec(nothing, 2)
+        @test JuliaSyntax.core_parser_hook(" #==# ", "somefile", 1, 6, :statement) ==
+              Core.svec(nothing, 6)
 
-        @test JuliaSyntax.core_parser_hook(" x \n", "somefile", 1, 0, :statement) == Core.svec(:x,4)
-        @test JuliaSyntax.core_parser_hook(" x \n", "somefile", 1, 0, :atom)      == Core.svec(:x,2)
+        @test JuliaSyntax.core_parser_hook(" x \n", "somefile", 1, 0, :statement) ==
+              Core.svec(:x, 4)
+        @test JuliaSyntax.core_parser_hook(" x \n", "somefile", 1, 0, :atom) ==
+              Core.svec(:x, 2)
     end
 
     @testset "filename and lineno" begin
@@ -31,22 +37,20 @@ end
         @test ex.args[2] == LineNumberNode(2, "otherfile")
 
         # Errors also propagate file & lineno
-        err = _unwrap_parse_error(
-            JuliaSyntax.core_parser_hook("[x)", "f1", 1, 0, :statement)
-        )
+        err =
+            _unwrap_parse_error(JuliaSyntax.core_parser_hook("[x)", "f1", 1, 0, :statement))
         @test err isa JuliaSyntax.ParseError
         @test err.source.filename == "f1"
         @test err.source.first_line == 1
-        err = _unwrap_parse_error(
-            JuliaSyntax.core_parser_hook("[x)", "f2", 2, 0, :statement)
-        )
+        err =
+            _unwrap_parse_error(JuliaSyntax.core_parser_hook("[x)", "f2", 2, 0, :statement))
         @test err isa JuliaSyntax.ParseError
         @test err.source.filename == "f2"
         @test err.source.first_line == 2
 
         # Errors including nontrivial offset indices
         err = _unwrap_parse_error(
-            JuliaSyntax.core_parser_hook("a\nh{x)\nb", "test.jl", 1, 2, :statement)
+            JuliaSyntax.core_parser_hook("a\nh{x)\nb", "test.jl", 1, 2, :statement),
         )
         @test err isa JuliaSyntax.ParseError
         @test err.source.first_line == 1
@@ -88,7 +92,7 @@ end
         # Check the exception type that Meta.parse throws
         if JuliaSyntax._has_v1_10_hooks
             @test_throws Meta.ParseError Meta.parse("[x)")
-            @test_throws Meta.ParseError eval(Meta.parse("[x)", raise=false))
+            @test_throws Meta.ParseError eval(Meta.parse("[x)", raise = false))
             @test_throws Meta.ParseError eval(Meta.parse("(x")) # Expr(:incomplete)
         else
             @test_throws JuliaSyntax.ParseError Meta.parse("[x)")
@@ -117,7 +121,8 @@ end
         if JuliaSyntax._has_v1_10_hooks
             @test err.args[1] isa Meta.ParseError
             exc = err.args[1]
-            @test exc.msg == "ParseError:\n# Error @ none:1:2\n\"\n#└ ── unterminated string literal"
+            @test exc.msg ==
+                  "ParseError:\n# Error @ none:1:2\n\"\n#└ ── unterminated string literal"
             @test exc.detail isa JuliaSyntax.ParseError
             @test exc.detail.incomplete_tag === :string
         else
@@ -125,66 +130,65 @@ end
         end
 
         for (str, tag) in [
-                "\""           => :string
-                "\"\$foo"      => :string
-                "#="           => :comment
-                "'"            => :char
-                "'a"           => :char
-                "`"            => :cmd
-                "("            => :other
-                "["            => :other
-                "begin"        => :block
-                "quote"        => :block
-                "let"          => :block
-                "let;"         => :block
-                "for"          => :other
-                "for x=xs"     => :block
-                "function"     => :other
-                "function f()" => :block
-                "macro"        => :other
-                "macro f()"    => :block
-                "f() do"       => :other
-                "f() do x"     => :block
-                "module"       => :other
-                "module X"     => :block
-                "baremodule"   => :other
-                "baremodule X" => :block
-                "mutable struct"    => :other
-                "mutable struct X"  => :block
-                "struct"       => :other
-                "struct X"     => :block
-                "if"           => :other
-                "if x"         => :block
-                "while"        => :other
-                "while x"      => :block
-                "try"          => :block
-                # could be `try x catch exc body end` or `try x catch ; body end`
-                "try x catch"  => :block
-                "using"        => :other
-                "import"       => :other
-                "local"        => :other
-                "global"       => :other
+            "\"" => :string
+            "\"\$foo" => :string
+            "#=" => :comment
+            "'" => :char
+            "'a" => :char
+            "`" => :cmd
+            "(" => :other
+            "[" => :other
+            "begin" => :block
+            "quote" => :block
+            "let" => :block
+            "let;" => :block
+            "for" => :other
+            "for x=xs" => :block
+            "function" => :other
+            "function f()" => :block
+            "macro" => :other
+            "macro f()" => :block
+            "f() do" => :other
+            "f() do x" => :block
+            "module" => :other
+            "module X" => :block
+            "baremodule" => :other
+            "baremodule X" => :block
+            "mutable struct" => :other
+            "mutable struct X" => :block
+            "struct" => :other
+            "struct X" => :block
+            "if" => :other
+            "if x" => :block
+            "while" => :other
+            "while x" => :block
+            "try" => :block
+            # could be `try x catch exc body end` or `try x catch ; body end`
+            "try x catch" => :block
+            "using" => :other
+            "import" => :other
+            "local" => :other
+            "global" => :other
+            "1 == 2 ?" => :other
+            "1 == 2 ? 3 :" => :other
+            "1," => :other
+            "1, " => :other
+            "1,\n" => :other
+            "1, \n" => :other
 
-                "1 == 2 ?"     => :other
-                "1 == 2 ? 3 :" => :other
-                "1,"           => :other
-                "1, "          => :other
-                "1,\n"         => :other
-                "1, \n"        => :other
+            # Reference parser fails to detect incomplete exprs in this case
+            "(x for y" => :other
 
-                # Reference parser fails to detect incomplete exprs in this case
-                "(x for y"     => :other
-
-                # Syntax which may be an error but is not incomplete
-                ""             => :none
-                ")"            => :none
-                "1))"          => :none
-                "a b"          => :none
-                "()x"          => :none
-                "."            => :none
-            ]
+            # Syntax which may be an error but is not incomplete
+            "" => :none
+            ")" => :none
+            "1))" => :none
+            "a b" => :none
+            "()x" => :none
+            "." => :none
+        ]
             @testset "$(repr(str))" begin
-                @test Base.incomplete_tag(Meta.parse(str, raise=false)) == tag
+                @test Base.incomplete_tag(Meta.parse(str, raise = false)) == tag
             end
         end
         JuliaSyntax.enable_in_core!(false)

@@ -19,7 +19,7 @@ _unsafe_wrap_substring(s) = (s.offset, unsafe_wrap(Vector{UInt8}, s.string))
 #--------------------------------------------------
 #
 # Internal error, used as assertion failure for cases we expect can't happen.
-@noinline function internal_error(strs::Vararg{String, N}) where {N}
+@noinline function internal_error(strs::Vararg{String,N}) where {N}
     error("Internal error: ", strs...)
 end
 
@@ -61,22 +61,22 @@ end
 # Text printing/display utils
 
 const _fg_color_codes = Dict(
-    :black         => 30,
-    :red           => 31,
-    :green         => 32,
-    :yellow        => 33,
-    :blue          => 34,
-    :magenta       => 35,
-    :cyan          => 36,
-    :white         => 37,
-    :light_black   => 90, # gray
-    :light_red     => 91,
-    :light_green   => 92,
-    :light_yellow  => 93,
-    :light_blue    => 94,
+    :black => 30,
+    :red => 31,
+    :green => 32,
+    :yellow => 33,
+    :blue => 34,
+    :magenta => 35,
+    :cyan => 36,
+    :white => 37,
+    :light_black => 90, # gray
+    :light_red => 91,
+    :light_green => 92,
+    :light_yellow => 93,
+    :light_blue => 94,
     :light_magenta => 95,
-    :light_cyan    => 96,
-    :light_white   => 97,
+    :light_cyan => 96,
+    :light_white => 97,
 )
 
 """
@@ -93,8 +93,9 @@ color terminals.
 * `bgcolor` - set background color
 * `href`    - set hyperlink reference
 """
-function _printstyled(io::IO, text; fgcolor=nothing, bgcolor=nothing, href=nothing)
-    if (isnothing(fgcolor) && isnothing(bgcolor) && isnothing(href)) || !get(io, :color, false)
+function _printstyled(io::IO, text; fgcolor = nothing, bgcolor = nothing, href = nothing)
+    if (isnothing(fgcolor) && isnothing(bgcolor) && isnothing(href)) ||
+       !get(io, :color, false)
         print(io, text)
         return
     end

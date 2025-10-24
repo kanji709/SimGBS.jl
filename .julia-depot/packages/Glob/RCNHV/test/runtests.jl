@@ -4,7 +4,7 @@ using Test
 macro test_types(arr, types)
     return quote
         @test length($arr) == length($types)
-        for i in 1:length($arr)
+        for i = 1:length($arr)
             @test isa($arr[i], $types[i])
         end
     end
@@ -26,7 +26,7 @@ end
 @test occursin(fn"AB*AB*??***", "ABABABCDEFG")
 @test occursin(fn"?AB*AB*??***", ".ABABABCDEFG")
 @test !occursin(fn"?AB*AB*??***"p, ".ABABABCDEFG")
-@test_throws ErrorException Glob.FilenameMatch("?AB*AB*??***","z")
+@test_throws ErrorException Glob.FilenameMatch("?AB*AB*??***", "z")
 @test occursin(fn"[abc]", "a")
 @test !occursin(fn"[abc]", "A")
 @test occursin(fn"[abc]"i, "A")
@@ -76,7 +76,7 @@ end
 @test occursin(fn"[\]]*"x, "][")
 @test occursin(fn"[\[-\]]*"x, "][")
 @test occursin(fn"[[-\]]*"x, "][")
-@test occursin(fn"base/[\[-\]]*"dpx,"base/][x")
+@test occursin(fn"base/[\[-\]]*"dpx, "base/][x")
 @test occursin(fn"[\[-\]]"x, "\\")
 @test occursin(fn"[[-\]]"x, "\\")
 @test occursin(fn"[---]", "-")
@@ -173,19 +173,17 @@ end
 @test_types glob"ab/[]/d".pattern (AbstractString, AbstractString, AbstractString)
 @test_types glob"ab/[]]/d".pattern (AbstractString, Glob.FilenameMatch, AbstractString)
 
-@test glob("*") == filter(x->!startswith(x,'.'), readdir()) == readdir(glob"*")
-@test glob(".*") == filter(x->startswith(x,'.'), readdir()) == readdir(glob".*")
+@test glob("*") == filter(x->!startswith(x, '.'), readdir()) == readdir(glob"*")
+@test glob(".*") == filter(x->startswith(x, '.'), readdir()) == readdir(glob".*")
 @test isempty(Glob.glob("[.]*"))
 @test glob([r".*"]) == readdir()
-@test glob([".", r".*"]) == map(x->joinpath(".",x), readdir())
-@test all([!startswith(x,'.') for x in Glob.glob("*.*")])
+@test glob([".", r".*"]) == map(x->joinpath(".", x), readdir())
+@test all([!startswith(x, '.') for x in Glob.glob("*.*")])
 
 function test_string(x1)
     x2 = string(eval(Meta.parse(x1)))
-    x1 == x2 ? nothing : error(string(
-        "string test failed:",
-        "\noriginal: ", x1,
-        "\n\nstringify: ", x2))
+    x1 == x2 ? nothing :
+    error(string("string test failed:", "\noriginal: ", x1, "\n\nstringify: ", x2))
 end
 
 test_string("""Glob.GlobMatch(Any["base", r"h\\.+"])""")

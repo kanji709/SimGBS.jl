@@ -32,9 +32,9 @@ end
 
 # Accessors / predicates
 haschildren(node::GreenNode) = !(node.args isa Tuple{})
-children(node::GreenNode)    = node.args
-span(node::GreenNode)        = node.span
-head(node::GreenNode)        = node.head
+children(node::GreenNode) = node.args
+span(node::GreenNode) = node.span
+head(node::GreenNode) = node.head
 
 Base.summary(node::GreenNode) = summary(node.head)
 
@@ -61,11 +61,11 @@ function _show_green_node(io, node, indent, pos, str, show_trivia)
         line = rpad(line, 41) * "✘"
     end
     if is_leaf && !isnothing(str)
-        line = string(rpad(line, 43), ' ', repr(str[pos:prevind(str, pos + span(node))]))
+        line = string(rpad(line, 43), ' ', repr(str[pos:prevind(str, pos+span(node))]))
     end
     line = line*"\n"
     if is_error(node)
-        printstyled(io, line, color=:light_red)
+        printstyled(io, line, color = :light_red)
     else
         print(io, line)
     end
@@ -83,7 +83,13 @@ function Base.show(io::IO, ::MIME"text/plain", node::GreenNode)
     _show_green_node(io, node, "", 1, nothing, true)
 end
 
-function Base.show(io::IO, ::MIME"text/plain", node::GreenNode, str::AbstractString; show_trivia=true)
+function Base.show(
+    io::IO,
+    ::MIME"text/plain",
+    node::GreenNode,
+    str::AbstractString;
+    show_trivia = true,
+)
     _show_green_node(io, node, "", 1, str, show_trivia)
 end
 
@@ -91,7 +97,6 @@ function build_tree(::Type{GreenNode}, stream::ParseStream; kws...)
     build_tree(GreenNode{SyntaxHead}, stream; kws...) do h, srcrange, cs
         span = length(srcrange)
         isnothing(cs) ? GreenNode(h, span, ()) :
-                        GreenNode(h, span, collect(GreenNode{SyntaxHead}, cs))
+        GreenNode(h, span, collect(GreenNode{SyntaxHead}, cs))
     end
 end
-
