@@ -39,7 +39,7 @@ function sampleChromosome(ind)
         recombs = sort(
             Array{Int64}(
                 sample(
-                    1:round(1e8 * chrLen[c] / 100),
+                    1:round(1e8*chrLen[c]/100),
                     rand(Binomial(binomN, chrLen[c] / 100 / binomN)),
                     replace = false,
                 ),
@@ -123,7 +123,7 @@ function constantPopSize(
 )
     parents = copy(founders)
     final = Array{individual}(undef, numIndFinal)
-    for gen = 1:numGen-numGenFinal
+    for gen = 1:(numGen-numGenFinal)
         offSpring = [
             sampleOffspring(
                 parents[sample(1:(size(parents, 1)), 1)[1]],
