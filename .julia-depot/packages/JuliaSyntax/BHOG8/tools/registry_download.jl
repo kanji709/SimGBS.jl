@@ -10,14 +10,14 @@ registry = only(filter(r->r.name == "General", Pkg.Registry.reachable_registries
 
 packages = []
 
-for (uuid,pkg) in registry
+for (uuid, pkg) in registry
     versions = collect(Pkg.Registry.registry_info(pkg).version_info)
-    latest_ver, ver_info = last(sort(versions, by=first))
+    latest_ver, ver_info = last(sort(versions, by = first))
     if ver_info.yanked
         continue
     end
 
-    push!(packages, (; uuid, pkg.name, version=latest_ver, ver_info.git_tree_sha1))
+    push!(packages, (; uuid, pkg.name, version = latest_ver, ver_info.git_tree_sha1))
 
 end
 
@@ -25,7 +25,7 @@ server = Pkg.pkg_server()
 output_dir = "pkgs"
 mkpath(output_dir)
 
-asyncmap(packages, ntasks=5) do pkg
+asyncmap(packages, ntasks = 5) do pkg
     url = "$server/package/$(pkg.uuid)/$(pkg.git_tree_sha1)"
     outfile_path = joinpath(output_dir, "$(pkg.name)_$(pkg.version).tgz")
     if isfile(outfile_path)
@@ -33,7 +33,7 @@ asyncmap(packages, ntasks=5) do pkg
         return outfile_path
     else
         @info "Download package" url outfile_path
-        for i=1:5
+        for i = 1:5
             try
                 Downloads.download(url, outfile_path)
                 break

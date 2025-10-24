@@ -7,10 +7,14 @@ end
 using TOML
 using Base: UUID, TOMLCache
 
-export load_preference, @load_preference,
-       has_preference, @has_preference,
-       set_preferences!, @set_preferences!,
-       delete_preferences!, @delete_preferences!
+export load_preference,
+    @load_preference,
+    has_preference,
+    @has_preference,
+    set_preferences!,
+    @set_preferences!,
+    delete_preferences!,
+    @delete_preferences!
 
 include("utils.jl")
 
@@ -128,7 +132,12 @@ function process_sentinel_values!(prefs::Dict)
 end
 
 # See the `set_preferences!()` docstring below for more details
-function set_preferences!(target_toml::String, pkg_name::String, pairs::Pair{String,<:Any}...; force::Bool = false)
+function set_preferences!(
+    target_toml::String,
+    pkg_name::String,
+    pairs::Pair{String,<:Any}...;
+    force::Bool = false,
+)
     # Load the old preferences in first, as we'll merge ours into whatever currently exists
     d = Dict{String,Any}()
     if isfile(target_toml)
@@ -149,8 +158,14 @@ function set_preferences!(target_toml::String, pkg_name::String, pairs::Pair{Str
     end
     # Set each preference, erroring unless `force` is set to `true`
     for (k, v) in pairs
-        if !force && haskey(prefs[pkg_name], k) && (v === missing || prefs[pkg_name][k] != v)
-            throw(ArgumentError("Cannot set preference '$(k)' to '$(v)' for $(pkg_name) in $(target_toml): preference already set to '$(prefs[pkg_name][k])'!"))
+        if !force &&
+           haskey(prefs[pkg_name], k) &&
+           (v === missing || prefs[pkg_name][k] != v)
+            throw(
+                ArgumentError(
+                    "Cannot set preference '$(k)' to '$(v)' for $(pkg_name) in $(target_toml): preference already set to '$(prefs[pkg_name][k])'!",
+                ),
+            )
         end
         prefs[pkg_name][k] = v
 
@@ -158,7 +173,7 @@ function set_preferences!(target_toml::String, pkg_name::String, pairs::Pair{Str
         prefs[pkg_name] = process_sentinel_values!(prefs[pkg_name])
     end
     open(target_toml, "w") do io
-        TOML.print(io, d, sorted=true)
+        TOML.print(io, d, sorted = true)
     end
     return nothing
 end
@@ -241,12 +256,14 @@ function _get_project_toml(u, active_project_only)
     return project_toml
 end
 
-function set_preferences!((u, pkg_name)::Tuple{UUID, String},
-                          prefs::Pair{String,<:Any}...;
-                          export_prefs=false,
-                          active_project_only::Bool=true,
-                          project_toml=nothing,
-                          kwargs...)
+function set_preferences!(
+    (u, pkg_name)::Tuple{UUID,String},
+    prefs::Pair{String,<:Any}...;
+    export_prefs = false,
+    active_project_only::Bool = true,
+    project_toml = nothing,
+    kwargs...,
+)
     if project_toml === nothing
         project_toml = _get_project_toml(u, active_project_only)
     end
@@ -267,7 +284,7 @@ function set_preferences!((u, pkg_name)::Tuple{UUID, String},
         end
         project["extras"][pkg_name] = string(u)
         open(project_toml, "w") do io
-            TOML.print(io, project; sorted=true)
+            TOML.print(io, project; sorted = true)
         end
         return project_toml, pkg_name
     end
@@ -291,11 +308,14 @@ function set_preferences!((u, pkg_name)::Tuple{UUID, String},
     end
     return set_preferences!(target_toml, pkg_name, prefs...; kwargs...)
 end
-function set_preferences!(u::UUID, prefs::Pair{String,<:Any}...;
-                          export_prefs=false,
-                          active_project_only::Bool=true,
-                          project_toml=_get_project_toml(u, active_project_only),
-                          kwargs...)
+function set_preferences!(
+    u::UUID,
+    prefs::Pair{String,<:Any}...;
+    export_prefs = false,
+    active_project_only::Bool = true,
+    project_toml = _get_project_toml(u, active_project_only),
+    kwargs...,
+)
 
     # Get the pkg name from the current environment if we can't find a
     # mapping for it in any environment block.  This assumes that the name
@@ -316,14 +336,17 @@ function set_preferences!(u::UUID, prefs::Pair{String,<:Any}...;
     if pkg_name === nothing
         error(
             "Cannot set preferences of an unknown package that is not loaded! " *
-            "(Hint: You can set the preference if you pass the name and UUID as a tuple.)"
+            "(Hint: You can set the preference if you pass the name and UUID as a tuple.)",
         )
     end
-    set_preferences!((u, pkg_name), prefs...;
-                     export_prefs=export_prefs,
-                     active_project_only=active_project_only,
-                     project_toml=project_toml,
-                     kwargs...)
+    set_preferences!(
+        (u, pkg_name),
+        prefs...;
+        export_prefs = export_prefs,
+        active_project_only = active_project_only,
+        project_toml = project_toml,
+        kwargs...,
+    )
 end
 function set_preferences!(m::Module, prefs::Pair{String,<:Any}...; kwargs...)
     return set_preferences!(get_uuid(m), prefs...; kwargs...)
@@ -332,7 +355,11 @@ function set_preferences!(name::String, prefs::Pair{String,<:Any}...; kwargs...)
     # Look up UUID
     uuid = get_uuid(name)
     if uuid === nothing
-        throw(ArgumentError("Cannot resolve package '$(name)' in load path; have you added the package as a top-level dependency?"))
+        throw(
+            ArgumentError(
+                "Cannot resolve package '$(name)' in load path; have you added the package as a top-level dependency?",
+            ),
+        )
     end
     return set_preferences!(uuid, prefs...; kwargs...)
 end
@@ -346,7 +373,7 @@ so for setting the preferences in other packages, pending private dependencies.
 """
 macro set_preferences!(prefs...)
     return quote
-        set_preferences!($(esc(get_uuid(__module__))), $(map(esc,prefs)...), force=true)
+        set_preferences!($(esc(get_uuid(__module__))), $(map(esc, prefs)...), force = true)
     end
 end
 
@@ -359,7 +386,12 @@ identified by the keys passed in as `prefs`.
 
 See the docstring for [`set_preferences!`](@ref) for more details.
 """
-function delete_preferences!(u::UUID, pref_keys::String...; block_inheritance::Bool = false, kwargs...)
+function delete_preferences!(
+    u::UUID,
+    pref_keys::String...;
+    block_inheritance::Bool = false,
+    kwargs...,
+)
     if block_inheritance
         return set_preferences!(u::UUID, [k => nothing for k in pref_keys]...; kwargs...)
     else
@@ -386,14 +418,18 @@ so for deleting the preferences in other packages, pending private dependencies.
 """
 macro delete_preferences!(prefs...)
     return quote
-        delete_preferences!($(esc(get_uuid(__module__))), $(map(esc,prefs)...), force=true)
+        delete_preferences!(
+            $(esc(get_uuid(__module__))),
+            $(map(esc, prefs)...),
+            force = true,
+        )
     end
 end
 
 # Precompilation to reduce latency (https://github.com/JuliaLang/julia/pull/43990#issuecomment-1025692379)
 get_uuid(Preferences)
 currently_compiling()
-precompile(Tuple{typeof(drop_clears), Any})
+precompile(Tuple{typeof(drop_clears),Any})
 if hasmethod(Base.BinaryPlatforms.Platform, (String, String, Dict{String}))
     precompile(load_preference, (Base.UUID, String, Nothing))
 end

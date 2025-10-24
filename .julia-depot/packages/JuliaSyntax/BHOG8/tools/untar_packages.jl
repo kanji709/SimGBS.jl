@@ -7,11 +7,13 @@ tarspath = joinpath(@__DIR__, "pkg_tars")
 mkpath(pkgspath)
 mkpath(tarspath)
 
-tar_info = [(m = match(r"(.*)_(\d+\.\d+\.\d+.*)\.tgz$", f); (f, m[1], VersionNumber(m[2])))
-            for f in readdir(tarspath) if endswith(f, ".tgz")]
+tar_info = [
+    (m = match(r"(.*)_(\d+\.\d+\.\d+.*)\.tgz$", f); (f, m[1], VersionNumber(m[2]))) for
+    f in readdir(tarspath) if endswith(f, ".tgz")
+]
 
 tar_maxver = Dict{String,VersionNumber}()
-for (_,name,ver) in tar_info
+for (_, name, ver) in tar_info
     v = get(tar_maxver, name, v"0.0.0")
     if v < ver
         tar_maxver[name] = ver
@@ -27,10 +29,10 @@ for tinfos in Iterators.partition(tar_info, 50)
             if pkgver != tar_maxver[pkgname]
                 if isdir(dir)
                     # Clean up old packages
-                    rm(dir; recursive=true, force=true)
+                    rm(dir; recursive = true, force = true)
                 end
             elseif !isdir(dir) || !isdir(joinpath(dir, "src"))
-                rm(dir; recursive=true, force=true)
+                rm(dir; recursive = true, force = true)
                 mkpath(dir)
                 tar_path = joinpath(tarspath, tarname)
                 try
@@ -54,7 +56,7 @@ let i = 0, tot_files = 0
             outpath = joinpath(r, f*".Expr")
             if !islink(fpath) && isfile(fpath) && !isfile(outpath)
                 code = read(fpath, String)
-                fl_ex = JuliaSyntax.fl_parseall(code, filename=fpath)
+                fl_ex = JuliaSyntax.fl_parseall(code, filename = fpath)
                 i += 1
                 if i % 100 == 0
                     @info "$i/$tot_files files parsed"

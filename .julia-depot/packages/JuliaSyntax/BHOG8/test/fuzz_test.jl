@@ -15,7 +15,6 @@ const all_tokens = [
     "@"
     ","
     ";"
-
     "baremodule"
     "begin"
     "break"
@@ -51,7 +50,6 @@ const all_tokens = [
     "primitive"
     "type"
     "var"
-
     "1"
     "0b1"
     "0x1"
@@ -63,7 +61,6 @@ const all_tokens = [
     "`s`"
     "true"
     "false"
-
     "["
     "]"
     "{"
@@ -74,7 +71,6 @@ const all_tokens = [
     "\"\"\""
     "`"
     "```"
-
     "="
     "+="
     "-="   # Also used for "−="
@@ -98,11 +94,8 @@ const all_tokens = [
     "≔"
     "⩴"
     "≕"
-
     "=>"
-
     "?"
-
     "-->"
     "<--"
     "<-->"
@@ -252,11 +245,8 @@ const all_tokens = [
     "↶"
     "↺"
     "↻"
-
     "||"
-
     "&&"
-
     "<:"
     ">:"
     ">"
@@ -545,10 +535,8 @@ const all_tokens = [
     "⟂"
     "⫪"
     "⫫"
-
     "<|"
     "|>"
-
     ":"
     ".."
     "…"
@@ -557,7 +545,6 @@ const all_tokens = [
     "⋱"
     "⋰"
     "⋯"
-
     "\$"
     "+"
     "-" # also used for "−"
@@ -616,7 +603,6 @@ const all_tokens = [
     "⩢"
     "⩣"
     "¦"
-
     "*"
     "/"
     "÷"
@@ -697,13 +683,10 @@ const all_tokens = [
     "⟗"
     "⌿"
     "⨟"
-
     "//"
-
     "<<"
     ">>"
     ">>>"
-
     "^"
     "↑"
     "↓"
@@ -735,18 +718,13 @@ const all_tokens = [
     "⥯"
     "￪"
     "￬"
-
     "::"
-
     "where"
-
     "."
-
     "!"
     "'"
     ".'"
     "->"
-
     "¬"
     "√"
     "∛"
@@ -764,7 +742,6 @@ const cutdown_tokens = [
     "@"
     ","
     ";"
-
     "baremodule"
     "begin"
     "break"
@@ -800,7 +777,6 @@ const cutdown_tokens = [
     "primitive"
     "type"
     "var"
-
     "1"
     "0b1"
     "0x1"
@@ -812,7 +788,6 @@ const cutdown_tokens = [
     "`s`"
     "true"
     "false"
-
     "["
     "]"
     "{"
@@ -823,21 +798,14 @@ const cutdown_tokens = [
     "\"\"\""
     "`"
     "```"
-
     "="
     "+="
     "~"
-
     "=>"
-
     "?"
-
     "-->"
-
     "||"
-
     "&&"
-
     "<:"
     ">:"
     ">"
@@ -847,42 +815,30 @@ const cutdown_tokens = [
     "=="
     "==="
     "!="
-
     "<|"
     "|>"
-
     ":"
     ".."
     "…"
-
     "\$"
     "+"
     "−"
     "-"
     "|"
-
     "*"
     "/"
     "⋅" # also used for lookalikes "·" and "·"
     "·"
     "\\"
-
     "//"
-
     "<<"
-
     "^"
-
     "::"
-
     "where"
-
     "."
-
     "!"
     "'"
     "->"
-
     "√"
 ]
 
@@ -891,7 +847,7 @@ const cutdown_tokens = [
 
 function try_parseall_failure(str)
     try
-        JuliaSyntax.parseall(JuliaSyntax.SyntaxNode, str, ignore_errors=true);
+        JuliaSyntax.parseall(JuliaSyntax.SyntaxNode, str, ignore_errors = true);
         return nothing
     catch exc
         !(exc isa InterruptException) || rethrow()
@@ -924,9 +880,9 @@ end
 """Delete `nlines` adjacent lines from code, at `niters` randomly chosen positions"""
 function delete_lines(lines, nlines, niters)
     selection = trues(length(lines))
-    for j=1:niters
-        i = rand(1:length(lines)-nlines)
-        selection[i:i+nlines] .= false
+    for j = 1:niters
+        i = rand(1:(length(lines)-nlines))
+        selection[i:(i+nlines)] .= false
     end
     join(lines[selection], '\n')
 end
@@ -936,9 +892,9 @@ function delete_tokens(code, tokens, ntokens, niters)
     # [ aa bbbb cc d eeeeee  ]
     #   |  |    |  | |     |
     selection = trues(length(tokens))
-    for j=1:niters
-        i = rand(1:length(tokens)-ntokens)
-        selection[i:i+ntokens] .= false
+    for j = 1:niters
+        i = rand(1:(length(tokens)-ntokens))
+        selection[i:(i+ntokens)] .= false
     end
     io = IOBuffer()
     i = 1
@@ -970,34 +926,34 @@ Fuzz test parser against all tuples of length `N` with elements taken from
 `tokens`.
 """
 function product_token_fuzz(tokens, N)
-    (join(ts) for ts in Iterators.product([tokens for _ in 1:N]...))
+    (join(ts) for ts in Iterators.product([tokens for _ = 1:N]...))
 end
 
 function random_token_fuzz(tokens, ntokens, ntries)
-    (join(rand(tokens, ntokens)) for _ in 1:ntries)
+    (join(rand(tokens, ntokens)) for _ = 1:ntries)
 end
 
 """
 Fuzz test parser against randomly generated binary strings
 """
 function random_binary_fuzz(nbytes, N)
-    (String(rand(UInt8, nbytes)) for _ in 1:N)
+    (String(rand(UInt8, nbytes)) for _ = 1:N)
 end
 
 """
 Fuzz test by deleting random lines of some given source `code`
 """
-function deleted_line_fuzz(code, N; nlines=10, niters=10)
+function deleted_line_fuzz(code, N; nlines = 10, niters = 10)
     lines = split(code, '\n')
-    (delete_lines(lines, nlines, niters) for _=1:N)
+    (delete_lines(lines, nlines, niters) for _ = 1:N)
 end
 
 """
 Fuzz test by deleting random tokens from given source `code`
 """
-function deleted_token_fuzz(code, N; ntokens=10, niters=10)
+function deleted_token_fuzz(code, N; ntokens = 10, niters = 10)
     ts = tokenize(code)
-    (delete_tokens(code, ts, ntokens, niters) for _=1:N)
+    (delete_tokens(code, ts, ntokens, niters) for _ = 1:N)
 end
 
 """
@@ -1022,4 +978,3 @@ end
 #
 # fuzz_test(try_hook_failure, product_token_fuzz(cutdown_tokens, 2))
 # fuzz_test(try_parseall_failure, product_token_fuzz(cutdown_tokens, 2))
-

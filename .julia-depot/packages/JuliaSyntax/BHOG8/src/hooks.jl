@@ -1,28 +1,28 @@
 # This file provides an adaptor to match the API expected by the Julia runtime
 # code in the binding Core._parse
 
-const _has_v1_6_hooks  = VERSION >= v"1.6"
+const _has_v1_6_hooks = VERSION >= v"1.6"
 const _has_v1_10_hooks = isdefined(Core, :_setparser!)
 
 # Find the first error in a SyntaxNode tree, returning the index of the error
 # within its parent and the node itself.
 function _first_error(t::SyntaxNode)
     if is_error(t)
-        return 0,t
+        return 0, t
     end
     if haschildren(t)
-        for (i,c) in enumerate(children(t))
+        for (i, c) in enumerate(children(t))
             if is_error(c)
-                return i,c
+                return i, c
             else
                 x = _first_error(c)
-                if x != (0,nothing)
+                if x != (0, nothing)
                     return x
                 end
             end
         end
     end
-    return 0,nothing
+    return 0, nothing
 end
 
 # Classify an incomplete expression, returning a Symbol compatible with
@@ -33,7 +33,7 @@ end
 # practice several categories are combined for the purposes of the REPL -
 # perhaps we can/should do something more precise in the future.)
 function _incomplete_tag(n::SyntaxNode, codelen)
-    i,c = _first_error(n)
+    i, c = _first_error(n)
     if isnothing(c) || last_byte(c) < codelen || codelen == 0
         return :none
     elseif first_byte(c) <= codelen
@@ -46,9 +46,9 @@ function _incomplete_tag(n::SyntaxNode, codelen)
         end
     end
     if kind(c) == K"error" && begin
-                cs = children(c)
-                length(cs) > 0
-            end
+        cs = children(c)
+        length(cs) > 0
+    end
         for cc in cs
             if kind(cc) == K"error"
                 return :other
@@ -72,7 +72,7 @@ function _incomplete_tag(n::SyntaxNode, codelen)
     elseif kp in KSet"module struct"
         return i == 1 ? :other : :block
     elseif kp == K"do"
-        return i < 3  ? :other : :block
+        return i < 3 ? :other : :block
     else
         return :other
     end
@@ -88,8 +88,10 @@ function _set_core_parse_hook(parser)
         # set to the JuliaSyntax parser. But how do we signal that to the dumping
         # code outside of the initial creation of Core?)
         i = Base.fieldindex(Base.JLOptions, :incremental)
-        ptr = convert(Ptr{fieldtype(Base.JLOptions, i)},
-                      cglobal(:jl_options, Base.JLOptions) + fieldoffset(Base.JLOptions, i))
+        ptr = convert(
+            Ptr{fieldtype(Base.JLOptions, i)},
+            cglobal(:jl_options, Base.JLOptions) + fieldoffset(Base.JLOptions, i),
+        )
         incremental = unsafe_load(ptr)
         if incremental != 0
             unsafe_store!(ptr, 0)
@@ -143,7 +145,7 @@ function core_parser_hook(code, filename::String, lineno::Int, offset::Int, opti
         # code buffer
         if code isa Core.SimpleVector
             # The C entry points will pass us this form.
-            (ptr,len) = code
+            (ptr, len) = code
             code = String(unsafe_wrap(Array, ptr, len))
         elseif !(code isa String || code isa SubString || code isa Vector{UInt8})
             # For non-Base string types, convert to UTF-8 encoding, using an
@@ -151,11 +153,14 @@ function core_parser_hook(code, filename::String, lineno::Int, offset::Int, opti
             code = Base.invokelatest(String, code)
         end
         if !isnothing(_debug_log[])
-            print(_debug_log[], """
-                  #-#-#-------------------------------
-                  # ENTER filename=$filename, lineno=$lineno, offset=$offset, options=$options"
-                  #-#-#-------------------------------
-                  """)
+            print(
+                _debug_log[],
+                """
+  #-#-#-------------------------------
+  # ENTER filename=$filename, lineno=$lineno, offset=$offset, options=$options"
+  #-#-#-------------------------------
+  """,
+            )
             write(_debug_log[], code)
         end
 
@@ -172,36 +177,44 @@ function core_parser_hook(code, filename::String, lineno::Int, offset::Int, opti
                 return Core.svec(nothing, last_byte(stream))
             end
         end
-        parse!(stream; rule=options)
+        parse!(stream; rule = options)
         if options === :statement
             bump_trivia(stream)
         end
 
         if any_error(stream)
-            tree = build_tree(SyntaxNode, stream, first_line=lineno, filename=filename)
+            tree = build_tree(SyntaxNode, stream, first_line = lineno, filename = filename)
             tag = _incomplete_tag(tree, lastindex(code))
             if _has_v1_10_hooks
-                exc = ParseError(stream, filename=filename, first_line=lineno,
-                                 incomplete_tag=tag)
+                exc = ParseError(
+                    stream,
+                    filename = filename,
+                    first_line = lineno,
+                    incomplete_tag = tag,
+                )
                 msg = sprint(showerror, exc)
-                error_ex = Expr(tag === :none ? :error : :incomplete,
-                                Meta.ParseError(msg, exc))
+                error_ex =
+                    Expr(tag === :none ? :error : :incomplete, Meta.ParseError(msg, exc))
             elseif tag !== :none
                 # Hack: For older Julia versions, replicate the messages which
                 # Base.incomplete_tag() will match
                 msg =
-                    tag === :string  ? "incomplete: invalid string syntax"     :
-                    tag === :comment ? "incomplete: unterminated multi-line comment #= ... =#" :
-                    tag === :block   ? "incomplete: construct requires end"    :
-                    tag === :cmd     ? "incomplete: invalid \"`\" syntax"      :
-                    tag === :char    ? "incomplete: invalid character literal" :
-                                       "incomplete: premature end of input"
+                    tag === :string ? "incomplete: invalid string syntax" :
+                    tag === :comment ?
+                    "incomplete: unterminated multi-line comment #= ... =#" :
+                    tag === :block ? "incomplete: construct requires end" :
+                    tag === :cmd ? "incomplete: invalid \"`\" syntax" :
+                    tag === :char ? "incomplete: invalid character literal" :
+                    "incomplete: premature end of input"
                 error_ex = Expr(:incomplete, msg)
             else
                 # In the flisp parser errors are normally `Expr(:error, msg)` where
                 # `msg` is a String. By using a JuliaSyntax.ParseError for msg
                 # we can do fancy error reporting instead.
-                error_ex = Expr(:error, ParseError(stream, filename=filename, first_line=lineno))
+                error_ex = Expr(
+                    :error,
+                    ParseError(stream, filename = filename, first_line = lineno),
+                )
             end
             ex = if options === :all
                 # When encountering a toplevel error, the reference parser
@@ -215,7 +228,7 @@ function core_parser_hook(code, filename::String, lineno::Int, offset::Int, opti
                     i -= 1
                 end
                 resize!(topex.args, i-1)
-                _,errort = _first_error(tree)
+                _, errort = _first_error(tree)
                 push!(topex.args, LineNumberNode(source_line(errort), filename))
                 push!(topex.args, error_ex)
                 topex
@@ -230,7 +243,7 @@ function core_parser_hook(code, filename::String, lineno::Int, offset::Int, opti
             #
             # show_diagnostics(stdout, stream.diagnostics, code)
             #
-            ex = build_tree(Expr, stream; filename=filename, first_line=lineno)
+            ex = build_tree(Expr, stream; filename = filename, first_line = lineno)
         end
 
         # Note the next byte in 1-based indexing is `last_byte(stream) + 1` but
@@ -239,29 +252,37 @@ function core_parser_hook(code, filename::String, lineno::Int, offset::Int, opti
         last_offset = last_byte(stream)
 
         if !isnothing(_debug_log[])
-            println(_debug_log[], """
-                    #-#-#-
-                    # EXIT last_offset=$last_offset
-                    #-#-#-
-                    """)
+            println(
+                _debug_log[],
+                """
+  #-#-#-
+  # EXIT last_offset=$last_offset
+  #-#-#-
+  """,
+            )
         end
 
         # Rewrap result in an svec for use by the C code
         return Core.svec(ex, last_offset)
     catch exc
         if !isnothing(_debug_log[])
-            println(_debug_log[], """
-                    #-#-#-
-                    # ERROR EXIT
-                    # $exc
-                    #-#-#-
-                    """)
+            println(
+                _debug_log[],
+                """
+  #-#-#-
+  # ERROR EXIT
+  # $exc
+  #-#-#-
+  """,
+            )
         end
-        @error("""JuliaSyntax parser failed — falling back to flisp!
-                  This is not your fault. Please submit a bug report to https://github.com/JuliaLang/JuliaSyntax.jl/issues""",
-               exception=(exc,catch_backtrace()),
-               offset=offset,
-               code=code)
+        @error(
+            """JuliaSyntax parser failed — falling back to flisp!
+               This is not your fault. Please submit a bug report to https://github.com/JuliaLang/JuliaSyntax.jl/issues""",
+            exception=(exc, catch_backtrace()),
+            offset=offset,
+            code=code
+        )
 
         _fl_parse_hook(code, filename, lineno, offset, options)
     end
@@ -297,10 +318,15 @@ Keyword arguments:
 * `debug_filename` - File name of parser debug log (defaults to `nothing` or
   the value of `ENV["JULIA_SYNTAX_DEBUG_FILE"]`).
 """
-function enable_in_core!(enable=true; freeze_world_age = true,
-        debug_filename   = get(ENV, "JULIA_SYNTAX_DEBUG_FILE", nothing))
+function enable_in_core!(
+    enable = true;
+    freeze_world_age = true,
+    debug_filename = get(ENV, "JULIA_SYNTAX_DEBUG_FILE", nothing),
+)
     if !_has_v1_6_hooks
-        error("Cannot use JuliaSyntax as the main Julia parser in Julia version $VERSION < 1.6")
+        error(
+            "Cannot use JuliaSyntax as the main Julia parser in Julia version $VERSION < 1.6",
+        )
     end
     if enable && !isnothing(debug_filename)
         _debug_log[] = open(debug_filename, "w")
@@ -329,13 +355,14 @@ function _fl_parse_hook(code, filename, lineno, offset, options)
         return Core.Compiler.fl_parse(code, filename, offset, options)
     else
         if options === :all
-            ex = Base.parse_input_line(String(code), filename=filename, depwarn=false)
+            ex = Base.parse_input_line(String(code), filename = filename, depwarn = false)
             if !@isexpr(ex, :toplevel)
                 ex = Expr(:toplevel, ex)
             end
             return ex, sizeof(code)
         elseif options === :statement || options === :atom
-            ex, pos = Meta.parse(code, offset+1, greedy=options==:statement, raise=false)
+            ex, pos =
+                Meta.parse(code, offset+1, greedy = options==:statement, raise = false)
             return ex, pos-1
         else
             error("Unknown parse options $options")
@@ -350,9 +377,9 @@ end
 """
 Like Meta.parse() but always call the flisp reference parser.
 """
-function fl_parse(str::AbstractString; raise::Bool=true, depwarn::Bool=true)
-    ex, pos = fl_parse(str, 1, greedy=true, raise=raise, depwarn=depwarn)
-    if isa(ex,Expr) && ex.head === :error
+function fl_parse(str::AbstractString; raise::Bool = true, depwarn::Bool = true)
+    ex, pos = fl_parse(str, 1, greedy = true, raise = raise, depwarn = depwarn)
+    if isa(ex, Expr) && ex.head === :error
         return ex
     end
     if pos <= ncodeunits(str)
@@ -362,10 +389,15 @@ function fl_parse(str::AbstractString; raise::Bool=true, depwarn::Bool=true)
     return ex
 end
 
-function fl_parse(str::AbstractString, pos::Integer; greedy::Bool=true, raise::Bool=true,
-                  depwarn::Bool=true)
+function fl_parse(
+    str::AbstractString,
+    pos::Integer;
+    greedy::Bool = true,
+    raise::Bool = true,
+    depwarn::Bool = true,
+)
     ex, pos = _fl_parse_string(str, "none", 1, pos, greedy ? :statement : :atom)
-    if raise && isa(ex,Expr) && ex.head === :error
+    if raise && isa(ex, Expr) && ex.head === :error
         throw(Meta.ParseError(ex.args[1]))
     end
     return ex, pos
@@ -374,13 +406,18 @@ end
 """
 Like Meta.parseall() but always call the flisp reference parser.
 """
-function fl_parseall(text::AbstractString; filename="none", lineno=1)
-    ex,_ = _fl_parse_string(text, String(filename), lineno, 1, :all)
+function fl_parseall(text::AbstractString; filename = "none", lineno = 1)
+    ex, _ = _fl_parse_string(text, String(filename), lineno, 1, :all)
     return ex
 end
 
-function _fl_parse_string(text::AbstractString, filename::AbstractString,
-                          lineno::Integer, index::Integer, options)
+function _fl_parse_string(
+    text::AbstractString,
+    filename::AbstractString,
+    lineno::Integer,
+    index::Integer,
+    options,
+)
     if index < 1 || index > ncodeunits(text) + 1
         throw(BoundsError(text, index))
     end
@@ -391,4 +428,3 @@ end
 # Convenience functions to mirror `JuliaSyntax.parsestmt(Expr, ...)` in simple cases.
 fl_parse(::Type{Expr}, args...; kws...) = fl_parse(args...; kws...)
 fl_parseall(::Type{Expr}, args...; kws...) = fl_parseall(args...; kws...)
-

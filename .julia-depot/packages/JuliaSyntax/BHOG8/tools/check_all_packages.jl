@@ -30,27 +30,27 @@ Logging.with_logger(TerminalLogger()) do
             open(deserialize, fpath*".Expr")
         else
             @warn "Expr cache not found, parsing using reference parser" expr_cache maxlog=1
-            JuliaSyntax.fl_parseall(text, filename=fpath)
+            JuliaSyntax.fl_parseall(text, filename = fpath)
         end
         @assert Meta.isexpr(e2, :toplevel)
         try
-            e1 = JuliaSyntax.parseall(Expr, text, filename=fpath, ignore_warnings=true)
+            e1 = JuliaSyntax.parseall(Expr, text, filename = fpath, ignore_warnings = true)
             if !exprs_roughly_equal(e2, e1)
                 mismatch_count += 1
-                failing_source = sprint(context=:color=>true) do io
+                failing_source = sprint(context = :color=>true) do io
                     for c in reduce_tree(parseall(SyntaxNode, text))
-                        JuliaSyntax.highlight(io, c.source, range(c), context_lines_inner=5)
+                        JuliaSyntax.highlight(io, c.source, range(c), context_lines_inner = 5)
                         println(io, "\n")
                     end
                 end
-                reduced_failures = reduce_text.(reduce_tree(text),
-                                                parsers_fuzzy_disagree)
+                reduced_failures = reduce_text.(reduce_tree(text), parsers_fuzzy_disagree)
                 append!(all_reduced_failures, reduced_failures)
-                @error("Parsers succeed but disagree",
-                       fpath,
-                       failing_source=Text(failing_source),
-                       reduced_failures,
-                       )
+                @error(
+                    "Parsers succeed but disagree",
+                    fpath,
+                    failing_source=Text(failing_source),
+                    reduced_failures,
+                )
             end
         catch err
             err isa InterruptException && rethrow()
@@ -87,7 +87,7 @@ println()
         $(mismatch_count) Expr mismatches
         $(t_avg)ms per file"""
 
-open(joinpath(@__DIR__, "reduced_failures.jl"), write=true) do io
+open(joinpath(@__DIR__, "reduced_failures.jl"), write = true) do io
     for str in all_reduced_failures
         println(io, repr(str))
     end
