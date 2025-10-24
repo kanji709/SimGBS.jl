@@ -984,10 +984,10 @@ let kind_int_type = :UInt16
 
         Base.instances(::Type{Kind}) = (
             Kind(i) for i =
-            reinterpret(
-                $kind_int_type,
-                typemin(Kind),
-            ):reinterpret($kind_int_type, typemax(Kind))
+                reinterpret(
+                    $kind_int_type,
+                    typemin(Kind),
+                ):reinterpret($kind_int_type, typemax(Kind))
         )
     end
 end
