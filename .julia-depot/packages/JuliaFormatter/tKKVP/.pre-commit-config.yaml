@@ -1,6 +1,0 @@
-# NOTE: Do NOT use this config in your own repositories. Instead, see 
-#   docs/integrations.md
-repos:
-- repo: local
-  hooks:
-  - id: "julia-formatter"
