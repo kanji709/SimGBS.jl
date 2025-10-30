@@ -1,0 +1,201 @@
+---
+title: "Running SimGBS in R via JuliaCall"
+author: "Jie Kang"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+# Introduction
+
+<b>SimGBS</b> is a rapid method for <b>simulating Genotyping-By-Sequencing data (GBS)</b>. It can be implemented with any genome of choice. Users can modify different parameters to customise GBS settings, such as the choice of restriction enzyme and sequencing depth. By taking the gene-drop approach, users can also specify the demographic history and define population structure (by supplying a pedigree file). Like real sequencers, SimGBS outputs data in FASTQ format.
+
+This document aims to demonstrate how to run **SimGBS** in **R** using the [`JuliaCall`](https://cran.r-project.org/package=JuliaCall) package.  
+All Julia commands are executed seamlessly within the R environment, allowing you to access the full functionality of SimGBS without leaving R.It mirrors the [Julia-based Colab notebook](https://colab.research.google.com/github/kanji709/SimGBS.jl/blob/master/tutorials/SimGBS_Julia_Colab_Notebook.ipynb), but executes all operations through R, delegating computation to Julia behind the scenes.
+
+---
+
+## [Optional] Download Julia
+```{r download-julia}
+# ===============================================================
+# JuliaCall requires access to a local Julia installation.
+# Below are examples for macOS, Windows, and Linux systems.
+# See: https://github.com/JuliaInterop/JuliaCall?tab=readme-ov-file#julia-is-not-found
+# ===============================================================
+
+## --- macOS (recommended: Juliaup via Homebrew) ---
+# Install Juliaup (official Julia version manager)
+# Run these commands in Terminal (not R):
+#   brew install juliaup
+#   juliaup default release
+# This typically installs Julia under:
+#   /opt/homebrew/Cellar/juliaup/<version>/bin/
+# Verify path with:
+#   which julia
+# Then specify in R:
+# julia <- julia_setup(JULIA_HOME = "/opt/homebrew/Cellar/juliaup/1.18.5/bin/")
+
+## --- Windows ---
+# Download from: https://julialang.org/downloads/
+# During installation, tick "Add Julia to PATH".
+# Then specify in R:
+# julia <- julia_setup(JULIA_HOME = "C:/Program Files/Julia-1.10.5/bin/")
+
+## --- Linux ---
+# Option 1: Install via package manager
+#   sudo apt update
+#   sudo apt install julia
+#
+# Option 2: Manual installation
+#   wget https://julialang-s3.julialang.org/bin/linux/x64/1.10/julia-1.10.5-linux-x86_64.tar.gz
+#   tar -xzf julia-1.10.5-linux-x86_64.tar.gz
+#   sudo mv julia-1.10.5 /opt/
+#   sudo ln -s /opt/julia-1.10.5/bin/julia /usr/local/bin/julia
+#
+# Then specify in R:
+# julia <- julia_setup(JULIA_HOME = "/opt/julia-1.10.5/bin/")
+
+## --- Verify connection ---
+# After installation, check JuliaCall can see Julia:
+# JuliaCall::julia_command("VERSION")
+# Expected output: v"1.10.5" or similar
+```
+## 1. Setup JuliaCall environment
+
+```{r setup, message=FALSE}
+if (!requireNamespace("JuliaCall", quietly = TRUE))
+  install.packages("JuliaCall", repos = "https://cloud.r-project.org")
+library(JuliaCall)
+
+# Initialise JuliaCall and point explicitly to your local Julia binary.
+# Replace the path below with the actual location of your Julia executable if different.
+# (e.g. on macOS installed via Juliaup: "/opt/homebrew/Cellar/juliaup/1.18.5/bin/")
+# For troubleshooting "Julia is not found" errors, see:
+# https://github.com/JuliaInterop/JuliaCall?tab=readme-ov-file#julia-is-not-found
+suppressWarnings(try(JuliaCall::julia_stop(), silent = TRUE))
+julia <- julia_setup(JULIA_HOME = "/opt/homebrew/Cellar/juliaup/1.18.5/bin/")
+
+# Confirm Julia version and executable path
+julia_command('println("Julia version: ", VERSION)')
+```
+
+---
+
+## 2. Install and Load SimGBS
+
+```{r install}
+# Try the registered release first; fall back to GitHub if needed
+julia_command('
+begin
+    import Pkg
+    try
+        Pkg.add("SimGBS")
+    catch
+        Pkg.add(url = "https://github.com/kanji709/SimGBS.jl")
+    end
+    using SimGBS
+    println("✔ SimGBS loaded successfully")
+end
+')
+```
+
+---
+
+## 3. Check that core functions are available
+
+```{r check-funcs}
+julia_eval('
+    println((
+        digestGenome      = isdefined(SimGBS, :digestGenome),
+        definePopulation  = isdefined(SimGBS, :definePopulation),
+        GBS               = isdefined(SimGBS, :GBS),
+        ApeKI             = isdefined(SimGBS, :ApeKI)
+    ))
+')
+```
+
+---
+
+## 4. Download example input data
+
+```{r data-download}
+julia_command('
+begin
+    using Downloads
+    cd(pwd())
+    Downloads.download("https://github.com/kanji709/SimGBS.jl/raw/master/example/ref.fa.gz", "ref.fa.gz")
+    Downloads.download("https://github.com/kanji709/SimGBS.jl/raw/master/example/GBS_Barcodes.txt", "GBS_Barcodes.txt")
+    println("✔ Example data downloaded: ", readdir())
+end
+')
+```
+
+---
+
+## 5. Run SimGBS example pipeline
+
+```{r run-simgbs, eval=TRUE}
+julia_command('
+begin
+    using SimGBS
+
+    # ---------- Step 1 : Generate GBS Fragments ----------
+    genofile   = "ref.fa.gz"
+    re         = [SimGBS.ApeKI]
+    useChr     = [1]
+    useChrLen  = Float64[]
+    lower      = 65
+    upper      = 195
+    winSize    = 1_000_000
+
+    # ---------- Step 2 : Define Population Structure ----------
+    numFounders = 100
+    endSize     = 1000
+    numGenCha   = 20
+    numGenCon   = 50
+    numGenFinal = 4
+    numInd      = 96
+    useWeights  = Float64[]
+    usePedigree = false
+    pedFile     = "newPed.ped"
+    pedOutput   = false
+
+    # ---------- Step 3 : Simulate GBS Process ----------
+    totalQTL          = 100
+    totalSNP          = 0
+    muDensity         = -2.0
+    sigmasqDensity    = 0.001
+    muAlleleFreq      = 0.5
+    sigmasqAlleleFreq = 0.0061
+    meanDepth         = 20.0
+    barcodeFile       = "GBS_Barcodes.txt"
+
+    plotOutput    = true     # set to FALSE if GR backend fails
+    writeOutput   = true
+    onlyOutputGBS = true
+
+    println("Running SimGBS example ...")
+    @time digestGenome(genofile, re, useChr, useChrLen, lower, upper, winSize, plotOutput, writeOutput)
+    @time definePopulation(numFounders, endSize, numGenCha, numGenCon, numGenFinal,
+                           numInd, useWeights, usePedigree, pedFile, pedOutput)
+    @time GBS(totalQTL, totalSNP, muDensity, sigmasqDensity, winSize,
+              muAlleleFreq, sigmasqAlleleFreq, re, meanDepth,
+              barcodeFile, useChr, plotOutput, writeOutput, onlyOutputGBS)
+    println("✔ SimGBS run completed.")
+end
+')
+```
+
+---
+
+## 6. Verify output files
+
+```{r check-output}
+list.files(pattern = "txt|csv|gz|pdf|png")
+```
+
+```{r}
+sessionInfo()
+```
+---
