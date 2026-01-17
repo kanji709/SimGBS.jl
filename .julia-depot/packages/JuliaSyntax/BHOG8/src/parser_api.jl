@@ -10,7 +10,7 @@ struct ParseError <: Exception
     incomplete_tag::Symbol # Used only for Base Expr(:incomplete) support
 end
 
-function ParseError(stream::ParseStream; incomplete_tag=:none, kws...)
+function ParseError(stream::ParseStream; incomplete_tag = :none, kws...)
     source = SourceFile(stream; kws...)
     ParseError(source, stream.diagnostics, incomplete_tag)
 end
@@ -39,9 +39,12 @@ structures may be extracted from `stream` with the [`build_tree`](@ref) function
 * `:atom` — parse a single syntax "atom": a literal, identifier, or
   parenthesized expression.
 """
-function parse!(stream::ParseStream; rule::Symbol=:all)
+function parse!(stream::ParseStream; rule::Symbol = :all)
     if rule == :toplevel
-        Base.depwarn("Use of rule == :toplevel in parse!() is deprecated. use `rule=:all` instead.", :parse!)
+        Base.depwarn(
+            "Use of rule == :toplevel in parse!() is deprecated. use `rule=:all` instead.",
+            :parse!,
+        )
         rule = :all
     end
     ps = ParseState(stream)
@@ -65,34 +68,52 @@ Parse Julia source code from a seekable `IO` object. The output is a tuple
 `(tree, diagnostics)`. When `parse!` returns, the stream `io` is positioned
 directly after the last byte which was consumed during parsing.
 """
-function parse!(::Type{TreeType}, io::IO;
-                rule::Symbol=:all, version=VERSION, kws...) where {TreeType}
-    stream = ParseStream(io; version=version)
-    parse!(stream; rule=rule)
+function parse!(
+    ::Type{TreeType},
+    io::IO;
+    rule::Symbol = :all,
+    version = VERSION,
+    kws...,
+) where {TreeType}
+    stream = ParseStream(io; version = version)
+    parse!(stream; rule = rule)
     tree = build_tree(TreeType, stream; kws...)
     seek(io, last_byte(stream))
     tree, stream.diagnostics
 end
 
-function _parse(rule::Symbol, need_eof::Bool, ::Type{T}, text, index=1; version=VERSION,
-                ignore_trivia=true, filename=nothing, first_line=1, ignore_errors=false,
-                ignore_warnings=ignore_errors, kws...) where {T}
-    stream = ParseStream(text, index; version=version)
+function _parse(
+    rule::Symbol,
+    need_eof::Bool,
+    ::Type{T},
+    text,
+    index = 1;
+    version = VERSION,
+    ignore_trivia = true,
+    filename = nothing,
+    first_line = 1,
+    ignore_errors = false,
+    ignore_warnings = ignore_errors,
+    kws...,
+) where {T}
+    stream = ParseStream(text, index; version = version)
     if ignore_trivia && rule != :all
-        bump_trivia(stream, skip_newlines=true)
+        bump_trivia(stream, skip_newlines = true)
     end
-    parse!(stream; rule=rule)
+    parse!(stream; rule = rule)
     if need_eof
-        if (ignore_trivia  && peek(stream, skip_newlines=true) != K"EndMarker") ||
-           (!ignore_trivia && (peek(stream, skip_newlines=false, skip_whitespace=false) != K"EndMarker"))
-            emit_diagnostic(stream, error="unexpected text after parsing $rule")
+        if (ignore_trivia && peek(stream, skip_newlines = true) != K"EndMarker") || (
+            !ignore_trivia &&
+            (peek(stream, skip_newlines = false, skip_whitespace = false) != K"EndMarker")
+        )
+            emit_diagnostic(stream, error = "unexpected text after parsing $rule")
         end
     end
     if (!ignore_errors && any_error(stream.diagnostics)) ||
-          (!ignore_warnings && !isempty(stream.diagnostics))
-        throw(ParseError(stream, filename=filename, first_line=first_line))
+       (!ignore_warnings && !isempty(stream.diagnostics))
+        throw(ParseError(stream, filename = filename, first_line = first_line))
     end
-    tree = build_tree(T, stream; filename=filename, first_line=first_line, kws...)
+    tree = build_tree(T, stream; filename = filename, first_line = first_line, kws...)
     tree, last_byte(stream) + 1
 end
 
@@ -137,17 +158,23 @@ also avoid exceptions due to errors, use `ignore_errors=true`.
 """
 
 "$_parse_docs"
-parsestmt(::Type{T}, text::AbstractString; kws...) where {T} = _parse(:statement, true, T, text; kws...)[1]
+parsestmt(::Type{T}, text::AbstractString; kws...) where {T} =
+    _parse(:statement, true, T, text; kws...)[1]
 
 "$_parse_docs"
-parseall(::Type{T}, text::AbstractString; kws...) where {T} = _parse(:all, true, T, text; kws...)[1]
+parseall(::Type{T}, text::AbstractString; kws...) where {T} =
+    _parse(:all, true, T, text; kws...)[1]
 
 "$_parse_docs"
-parseatom(::Type{T}, text::AbstractString; kws...) where {T} = _parse(:atom, true, T, text; kws...)[1]
+parseatom(::Type{T}, text::AbstractString; kws...) where {T} =
+    _parse(:atom, true, T, text; kws...)[1]
 
-parsestmt(::Type{T}, text::AbstractString, index::Integer; kws...) where {T} = _parse(:statement, false, T, text, index; kws...)
-parseall(::Type{T}, text::AbstractString, index::Integer; kws...) where {T} = _parse(:all, false, T, text, index; kws...)
-parseatom(::Type{T}, text::AbstractString, index::Integer; kws...) where {T} = _parse(:atom, false, T, text, index; kws...)
+parsestmt(::Type{T}, text::AbstractString, index::Integer; kws...) where {T} =
+    _parse(:statement, false, T, text, index; kws...)
+parseall(::Type{T}, text::AbstractString, index::Integer; kws...) where {T} =
+    _parse(:all, false, T, text, index; kws...)
+parseatom(::Type{T}, text::AbstractString, index::Integer; kws...) where {T} =
+    _parse(:atom, false, T, text, index; kws...)
 
 #-------------------------------------------------------------------------------
 # Tokens interface
@@ -179,14 +206,14 @@ This interface works on UTF-8 encoded string or buffer data only.
 """
 function tokenize(text)
     ps = ParseStream(text)
-    parse!(ps, rule=:all)
+    parse!(ps, rule = :all)
     ts = ps.tokens
     output_tokens = Token[]
     for i = 2:length(ts)
         if kind(ts[i]) == K"TOMBSTONE"
             continue
         end
-        r = ts[i-1].next_byte:ts[i].next_byte-1
+        r = ts[i-1].next_byte:(ts[i].next_byte-1)
         push!(output_tokens, Token(head(ts[i]), r))
     end
     output_tokens

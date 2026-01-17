@@ -2,10 +2,9 @@
 Nontrivia tokens (leaf nodes / literals) which are malformed are parsed into
 ErrorVal when `ignore_errors=true` during parsing.
 """
-struct ErrorVal
-end
+struct ErrorVal end
 
-Base.show(io::IO, ::ErrorVal) = printstyled(io, "✘", color=:light_red)
+Base.show(io::IO, ::ErrorVal) = printstyled(io, "✘", color = :light_red)
 
 #-------------------------------------------------------------------------------
 # This file contains utility functions for converting undecorated source
@@ -35,20 +34,18 @@ function parse_uint_literal(str::AbstractString, k)
     end
     ndigits = length(str)-2
     if k == K"HexInt"
-        return ndigits <= 2  ? Base.parse(UInt8, str)   :
-               ndigits <= 4  ? Base.parse(UInt16, str)  :
-               ndigits <= 8  ? Base.parse(UInt32, str)  :
-               ndigits <= 16 ? Base.parse(UInt64, str)  :
-               ndigits <= 32 ? Base.parse(UInt128, str) :
-               Base.parse(BigInt, str)
+        return ndigits <= 2 ? Base.parse(UInt8, str) :
+               ndigits <= 4 ? Base.parse(UInt16, str) :
+               ndigits <= 8 ? Base.parse(UInt32, str) :
+               ndigits <= 16 ? Base.parse(UInt64, str) :
+               ndigits <= 32 ? Base.parse(UInt128, str) : Base.parse(BigInt, str)
     elseif k == K"BinInt"
         ndigits = length(str)-2
-        return ndigits <= 8   ? Base.parse(UInt8, str)   :
-               ndigits <= 16  ? Base.parse(UInt16, str)  :
-               ndigits <= 32  ? Base.parse(UInt32, str)  :
-               ndigits <= 64  ? Base.parse(UInt64, str)  :
-               ndigits <= 128 ? Base.parse(UInt128, str) :
-               Base.parse(BigInt, str)
+        return ndigits <= 8 ? Base.parse(UInt8, str) :
+               ndigits <= 16 ? Base.parse(UInt16, str) :
+               ndigits <= 32 ? Base.parse(UInt32, str) :
+               ndigits <= 64 ? Base.parse(UInt64, str) :
+               ndigits <= 128 ? Base.parse(UInt128, str) : Base.parse(BigInt, str)
     elseif k == K"OctInt"
         x = Base.tryparse(UInt64, str)
         if isnothing(x)
@@ -59,12 +56,11 @@ function parse_uint_literal(str::AbstractString, k)
                 x = BigInt(x)
             end
         else
-            x = ndigits <= 3  && x <= typemax(UInt8)  ? UInt8(x)   :
-                ndigits <= 6  && x <= typemax(UInt16) ? UInt16(x)  :
-                ndigits <= 11 && x <= typemax(UInt32) ? UInt32(x)  :
-                ndigits <= 22                         ? x          :
-                ndigits <= 43                         ? UInt128(x) :
-                BigInt(x)
+            x =
+                ndigits <= 3 && x <= typemax(UInt8) ? UInt8(x) :
+                ndigits <= 6 && x <= typemax(UInt16) ? UInt16(x) :
+                ndigits <= 11 && x <= typemax(UInt32) ? UInt32(x) :
+                ndigits <= 22 ? x : ndigits <= 43 ? UInt128(x) : BigInt(x)
         end
         return x
     end
@@ -77,12 +73,16 @@ Like `Base.parse(Union{Float64,Float32}, str)`, but permits float underflow
 Parse a Float64. str[firstind:lastind] must be a valid floating point literal
 string. If the value is outside Float64 range.
 """
-function parse_float_literal(::Type{T}, str::Union{String,SubString,Vector{UInt8}},
-        firstind::Integer, endind::Integer) where {T} # force specialize with where {T}
+function parse_float_literal(
+    ::Type{T},
+    str::Union{String,SubString,Vector{UInt8}},
+    firstind::Integer,
+    endind::Integer,
+) where {T} # force specialize with where {T}
     strsize = endind - firstind
     bufsz = 50
     if strsize < bufsz
-        buf = Ref{NTuple{bufsz, UInt8}}()
+        buf = Ref{NTuple{bufsz,UInt8}}()
         ptr = Base.unsafe_convert(Ptr{UInt8}, pointer_from_objref(buf))
         GC.@preserve str buf begin
             n = _copy_normalize_number!(ptr, pointer(str, firstind), strsize)
@@ -109,9 +109,10 @@ function _copy_normalize_number!(dest, src, srcsize)
         if b == UInt8('_')
             i += 1
             continue
-        elseif b == 0xe2 && i+2 < srcsize &&
-                unsafe_load(src + i + 1) == 0x88 &&
-                unsafe_load(src + i + 2) == 0x92
+        elseif b == 0xe2 &&
+               i+2 < srcsize &&
+               unsafe_load(src + i + 1) == 0x88 &&
+               unsafe_load(src + i + 2) == 0x92
             # src at i,i+1,i+2 is UTF-8 code for unicode minus sign '−'
             b = UInt8('-')
             i += 2
@@ -150,7 +151,7 @@ end
 @inline function _unsafe_parse_float(::Type{Float32}, ptr, strsize)
     # Convert float exponent 'f' to 'e' for strtof, eg, 1.0f0 => 1.0e0
     # Presumes we can modify the data in ptr!
-    for p in ptr+strsize-1:-1:ptr
+    for p = (ptr+strsize-1):-1:ptr
         if unsafe_load(p) == UInt8('f')
             unsafe_store!(p, UInt8('e'))
             break
@@ -164,7 +165,9 @@ end
         # strtof seems buggy on windows and doesn't set ERANGE correctly on
         # overflow. See also
         # https://github.com/JuliaLang/julia/issues/46544
-        x = Float32(ccall(:jl_strtod_c, Cdouble, (Ptr{UInt8}, Ptr{Ptr{UInt8}}), ptr, endptr))
+        x = Float32(
+            ccall(:jl_strtod_c, Cdouble, (Ptr{UInt8}, Ptr{Ptr{UInt8}}), ptr, endptr),
+        )
         if isinf(x)
             status = :overflow
             # Underflow not detected, but that will only be a warning elsewhere.
@@ -184,8 +187,7 @@ end
 """
 Process Julia source code escape sequences for raw strings
 """
-function unescape_raw_string(io::IO, txtbuf::Vector{UInt8},
-                             firstind, endind, is_cmd::Bool)
+function unescape_raw_string(io::IO, txtbuf::Vector{UInt8}, firstind, endind, is_cmd::Bool)
     delim = is_cmd ? u8"`" : u8"\""
     i = firstind
     while i < endind
@@ -210,7 +212,7 @@ function unescape_raw_string(io::IO, txtbuf::Vector{UInt8},
         nbackslash = j - i
         if (j < endind && txtbuf[j] == delim) || j >= endind
             # Backslashes before a delimiter must also be escaped
-            nbackslash = div(nbackslash,2)
+            nbackslash = div(nbackslash, 2)
         end
         for k = 1:nbackslash
             write(io, u8"\\")
@@ -227,8 +229,7 @@ end
 Process Julia source code escape sequences for non-raw strings.
 `txtbuf` should be passed without delimiting quotes.
 """
-function unescape_julia_string(io::IO, txtbuf::Vector{UInt8},
-                               firstind, endind, diagnostics)
+function unescape_julia_string(io::IO, txtbuf::Vector{UInt8}, firstind, endind, diagnostics)
     had_error = false
     i = firstind
     while i < endind
@@ -250,28 +251,32 @@ function unescape_julia_string(io::IO, txtbuf::Vector{UInt8},
         escstart = i
         i += 1
         if i >= endind
-            emit_diagnostic(diagnostics, escstart:endind-1,
-                            error="invalid escape sequence")
+            emit_diagnostic(
+                diagnostics,
+                escstart:(endind-1),
+                error = "invalid escape sequence",
+            )
             had_error = true
             break
         end
         c = txtbuf[i]
         if c == u8"x" || c == u8"u" || c == u8"U"
             n = k = 0
-            m = c == u8"x" ? 2 :
-                c == u8"u" ? 4 : 8
+            m = c == u8"x" ? 2 : c == u8"u" ? 4 : 8
             while (k += 1) <= m && i+1 < endind
                 nc = txtbuf[i+1]
-                n = u8"0" <= nc <= u8"9" ? n<<4 + (nc-u8"0") :
+                n =
+                    u8"0" <= nc <= u8"9" ? n<<4 + (nc-u8"0") :
                     u8"a" <= nc <= u8"f" ? n<<4 + (nc-u8"a"+10) :
                     u8"A" <= nc <= u8"F" ? n<<4 + (nc-u8"A"+10) : break
                 i += 1
             end
             if k == 1 || n > 0x10ffff
                 u = m == 4 ? u8"u" : u8"U"
-                msg = (m == 2) ? "invalid hex escape sequence" :
-                                 "invalid unicode escape sequence"
-                emit_diagnostic(diagnostics, escstart:i, error=msg)
+                msg =
+                    (m == 2) ? "invalid hex escape sequence" :
+                    "invalid unicode escape sequence"
+                emit_diagnostic(diagnostics, escstart:i, error = msg)
                 had_error = true
             else
                 if m == 2 # \x escape sequence
@@ -289,8 +294,11 @@ function unescape_julia_string(io::IO, txtbuf::Vector{UInt8},
                 i += 1
             end
             if n > 255
-                emit_diagnostic(diagnostics, escstart:i,
-                                error="invalid octal escape sequence")
+                emit_diagnostic(
+                    diagnostics,
+                    escstart:i,
+                    error = "invalid octal escape sequence",
+                )
                 had_error = true
             else
                 write(io, UInt8(n))
@@ -308,13 +316,9 @@ function unescape_julia_string(io::IO, txtbuf::Vector{UInt8},
                 # Literal escapes allowed in Julia source
                 c == u8"\\" ? u8"\\" :
                 c == u8"'" ? u8"'" :
-                c == u8"\"" ? u8"\"" :
-                c == u8"$" ? u8"$" :
-                c == u8"`" ? u8"`" :
-                nothing
+                c == u8"\"" ? u8"\"" : c == u8"$" ? u8"$" : c == u8"`" ? u8"`" : nothing
             if isnothing(u)
-                emit_diagnostic(diagnostics, escstart:i,
-                                error="invalid escape sequence")
+                emit_diagnostic(diagnostics, escstart:i, error = "invalid escape sequence")
                 had_error = true
             else
                 write(io, u)
@@ -339,19 +343,30 @@ end
 
 # static wrapper around user callback function
 function utf8proc_custom_func(codepoint::UInt32, ::Ptr{Cvoid})::UInt32
-    (codepoint == 0x025B ? 0x03B5 :  # 'ɛ' => 'ε'
-    codepoint == 0x00B5 ? 0x03BC :   # 'µ' => 'μ'
-    codepoint == 0x00B7 ? 0x22C5 :   # '·' => '⋅'
-    codepoint == 0x0387 ? 0x22C5 :   # '·' => '⋅'
-    codepoint == 0x2212 ? 0x002D :   # '−' (\minus) => '-'
-    codepoint == 0x210F ? 0x0127 :   # 'ℏ' (\hslash) => 'ħ' \hbar
-    codepoint)
+    (
+        codepoint == 0x025B ? 0x03B5 :  # 'ɛ' => 'ε'
+        codepoint == 0x00B5 ? 0x03BC :   # 'µ' => 'μ'
+        codepoint == 0x00B7 ? 0x22C5 :   # '·' => '⋅'
+        codepoint == 0x0387 ? 0x22C5 :   # '·' => '⋅'
+        codepoint == 0x2212 ? 0x002D :   # '−' (\minus) => '-'
+        codepoint == 0x210F ? 0x0127 :   # 'ℏ' (\hslash) => 'ħ' \hbar
+        codepoint
+    )
 end
 
 function utf8proc_decompose(str, options, buffer, nwords)
-    ret = ccall(:utf8proc_decompose_custom, Int, (Ptr{UInt8}, Int, Ptr{UInt8}, Int, Cint, Ptr{Cvoid}, Ptr{Cvoid}),
-                str, sizeof(str), buffer, nwords, options,
-                @cfunction(utf8proc_custom_func, UInt32, (UInt32, Ptr{Cvoid})), C_NULL)
+    ret = ccall(
+        :utf8proc_decompose_custom,
+        Int,
+        (Ptr{UInt8}, Int, Ptr{UInt8}, Int, Cint, Ptr{Cvoid}, Ptr{Cvoid}),
+        str,
+        sizeof(str),
+        buffer,
+        nwords,
+        options,
+        @cfunction(utf8proc_custom_func, UInt32, (UInt32, Ptr{Cvoid})),
+        C_NULL,
+    )
     ret < 0 && Base.Unicode.utf8proc_error(ret)
     return ret
 end
@@ -360,7 +375,8 @@ function utf8proc_map(str::Union{String,SubString{String}}, options::Integer)
     nwords = utf8proc_decompose(str, options, C_NULL, 0)
     buffer = Base.StringVector(nwords*4)
     nwords = utf8proc_decompose(str, options, buffer, nwords)
-    nbytes = ccall(:utf8proc_reencode, Int, (Ptr{UInt8}, Int, Cint), buffer, nwords, options)
+    nbytes =
+        ccall(:utf8proc_reencode, Int, (Ptr{UInt8}, Int, Cint), buffer, nwords, options)
     nbytes < 0 && Base.Unicode.utf8proc_error(nbytes)
     return String(resize!(buffer, nbytes))
 end
@@ -377,17 +393,20 @@ function parse_julia_literal(txtbuf::Vector{UInt8}, head::SyntaxHead, srcrange)
     # Any errors parsing literals are represented as ErrorVal() - this can
     # happen when the user sets `ignore_errors=true` during parsing.
     if k == K"Float"
-        v, code = parse_float_literal(Float64, txtbuf, first(srcrange),
-                                      last(srcrange)+1)
+        v, code = parse_float_literal(Float64, txtbuf, first(srcrange), last(srcrange)+1)
         return (code === :ok || code === :underflow) ? v : ErrorVal()
     elseif k == K"Float32"
-        v, code = parse_float_literal(Float32, txtbuf, first(srcrange),
-                                      last(srcrange)+1)
+        v, code = parse_float_literal(Float32, txtbuf, first(srcrange), last(srcrange)+1)
         return (code === :ok || code === :underflow) ? v : ErrorVal()
     elseif k == K"Char"
         io = IOBuffer()
-        had_error = unescape_julia_string(io, txtbuf, first(srcrange),
-                                          last(srcrange)+1, Diagnostic[])
+        had_error = unescape_julia_string(
+            io,
+            txtbuf,
+            first(srcrange),
+            last(srcrange)+1,
+            Diagnostic[],
+        )
         if had_error
             return ErrorVal()
         else
@@ -399,11 +418,21 @@ function parse_julia_literal(txtbuf::Vector{UInt8}, head::SyntaxHead, srcrange)
         io = IOBuffer()
         had_error = false
         if has_flags(head, RAW_STRING_FLAG)
-            unescape_raw_string(io, txtbuf, first(srcrange), last(srcrange)+1,
-                                k == K"CmdString")
+            unescape_raw_string(
+                io,
+                txtbuf,
+                first(srcrange),
+                last(srcrange)+1,
+                k == K"CmdString",
+            )
         else
-            had_error = unescape_julia_string(io, txtbuf, first(srcrange),
-                                              last(srcrange)+1, Diagnostic[])
+            had_error = unescape_julia_string(
+                io,
+                txtbuf,
+                first(srcrange),
+                last(srcrange)+1,
+                Diagnostic[],
+            )
         end
         return had_error ? ErrorVal() : String(take!(io))
     elseif k == K"true"
@@ -427,9 +456,8 @@ function parse_julia_literal(txtbuf::Vector{UInt8}, head::SyntaxHead, srcrange)
             Symbol(normalize_identifier(val_str))
         end
     elseif is_operator(k)
-        isempty(srcrange)  ?
-            Symbol(untokenize(k)) : # synthetic invisible tokens
-            Symbol(normalize_identifier(val_str))
+        isempty(srcrange) ? Symbol(untokenize(k)) : # synthetic invisible tokens
+        Symbol(normalize_identifier(val_str))
     elseif k == K"error"
         ErrorVal()
     elseif k == K"MacroName"
@@ -451,4 +479,3 @@ function parse_julia_literal(txtbuf::Vector{UInt8}, head::SyntaxHead, srcrange)
         ErrorVal()
     end
 end
-

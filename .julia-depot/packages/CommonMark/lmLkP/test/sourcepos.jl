@@ -1,10 +1,9 @@
 @testset "Sourcepos" begin
-    macro_ast_multiline = @__LINE__() + 2,
-    cm"""
-    # Header
+    macro_ast_multiline = @__LINE__() + 2, cm"""
+                                           # Header
 
-    > quote
-    """
+                                           > quote
+                                           """
     out = html(macro_ast_multiline[2]; sourcepos = true)
     @test occursin("data-sourcepos=\"$(macro_ast_multiline[1])", out)
 

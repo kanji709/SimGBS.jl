@@ -4,8 +4,7 @@ export tokenize, untokenize
 
 using ..JuliaSyntax: JuliaSyntax, Kind, @K_str, @KSet_str
 
-import ..JuliaSyntax: kind,
-    is_literal, is_error, is_contextual_keyword, is_word_operator
+import ..JuliaSyntax: kind, is_literal, is_error, is_contextual_keyword, is_word_operator
 
 #-------------------------------------------------------------------------------
 # Character-based predicates for tokenization
@@ -51,9 +50,11 @@ function is_never_id_char(ch::Char)
         (cat >= Unicode.UTF8PROC_CATEGORY_ZS && cat <= Unicode.UTF8PROC_CATEGORY_CS) ||
 
         # ASCII and Latin1 non-connector punctuation
-        (c < 0xff &&
-         cat >= Unicode.UTF8PROC_CATEGORY_PD && cat <= Unicode.UTF8PROC_CATEGORY_PO) ||
-
+        (
+            c < 0xff &&
+            cat >= Unicode.UTF8PROC_CATEGORY_PD &&
+            cat <= Unicode.UTF8PROC_CATEGORY_PO
+        ) ||
         c == UInt32('`') ||
 
         # mathematical brackets
@@ -84,16 +85,19 @@ const _ops_with_unicode_aliases = [
 
 function _nondot_symbolic_operator_kinds()
     op_range = reinterpret(UInt16, K"BEGIN_OPS"):reinterpret(UInt16, K"END_OPS")
-    setdiff(reinterpret.(Kind, op_range), [
-        K"ErrorInvalidOperator"
-        K"Error**"
-        K"..."
-        K"."
-        K"where"
-        K"isa"
-        K"in"
-        K".'"
-    ])
+    setdiff(
+        reinterpret.(Kind, op_range),
+        [
+            K"ErrorInvalidOperator"
+            K"Error**"
+            K"..."
+            K"."
+            K"where"
+            K"isa"
+            K"in"
+            K".'"
+        ],
+    )
 end
 
 function _char_in_set_expr(varname, firstchars)
@@ -112,17 +116,21 @@ function _char_in_set_expr(varname, firstchars)
         end
         i = j+1
     end
-    foldr((t1,t2)->:($t1 || $t2), terms)
+    foldr((t1, t2)->:($t1 || $t2), terms)
 end
 
 @eval function is_operator_start_char(c)
-   if c == EOF_CHAR || !isvalid(c)
-       return false
-   end
-   u = UInt32(c)
-   return $(_char_in_set_expr(:u,
-       append!(first.(string.(_nondot_symbolic_operator_kinds())),
-               first.(_ops_with_unicode_aliases))))
+    if c == EOF_CHAR || !isvalid(c)
+        return false
+    end
+    u = UInt32(c)
+    return $(_char_in_set_expr(
+        :u,
+        append!(
+            first.(string.(_nondot_symbolic_operator_kinds())),
+            first.(_ops_with_unicode_aliases),
+        ),
+    ))
 end
 
 # Checks whether a Char is an operator which can be prefixed with a dot `.`
@@ -138,39 +146,44 @@ end
         return false
     end
     cat = Base.Unicode.category_code(u)
-    if (cat == Base.Unicode.UTF8PROC_CATEGORY_MN ||
+    if (
+        cat == Base.Unicode.UTF8PROC_CATEGORY_MN ||
         cat == Base.Unicode.UTF8PROC_CATEGORY_MC ||
-        cat == Base.Unicode.UTF8PROC_CATEGORY_ME)
+        cat == Base.Unicode.UTF8PROC_CATEGORY_ME
+    )
         return true
     end
     # Additional allowed cases
-    return $(_char_in_set_expr(:u,
-        collect("²³¹ʰʲʳʷʸˡˢˣᴬᴮᴰᴱᴳᴴᴵᴶᴷᴸᴹᴺᴼᴾᴿᵀᵁᵂᵃᵇᵈᵉᵍᵏᵐᵒᵖᵗᵘᵛᵝᵞᵟᵠᵡᵢᵣᵤᵥᵦᵧᵨᵩᵪᶜᶠᶥᶦᶫᶰᶸᶻᶿ′″‴‵‶‷⁗⁰ⁱ⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿ₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₒₓₕₖₗₘₙₚₛₜⱼⱽꜛꜜꜝ")))
+    return $(_char_in_set_expr(
+        :u,
+        collect(
+            "²³¹ʰʲʳʷʸˡˢˣᴬᴮᴰᴱᴳᴴᴵᴶᴷᴸᴹᴺᴼᴾᴿᵀᵁᵂᵃᵇᵈᵉᵍᵏᵐᵒᵖᵗᵘᵛᵝᵞᵟᵠᵡᵢᵣᵤᵥᵦᵧᵨᵩᵪᶜᶠᶥᶦᶫᶰᶸᶻᶿ′″‴‵‶‷⁗⁰ⁱ⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿ₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₒₓₕₖₗₘₙₚₛₜⱼⱽꜛꜜꜝ",
+        ),
+    ))
 end
 
 function optakessuffix(k)
-    (K"BEGIN_OPS" <= k <= K"END_OPS") &&
-    !(
+    (K"BEGIN_OPS" <= k <= K"END_OPS") && !(
         k == K"..." ||
         K"BEGIN_ASSIGNMENTS" <= k <= K"END_ASSIGNMENTS" ||
-        k == K"?"   ||
-        k == K"<:"  ||
-        k == K">:"  ||
-        k == K"&&"  ||
-        k == K"||"  ||
-        k == K"in"  ||
+        k == K"?" ||
+        k == K"<:" ||
+        k == K">:" ||
+        k == K"&&" ||
+        k == K"||" ||
+        k == K"in" ||
         k == K"isa" ||
-        k == K"≔"   ||
-        k == K"⩴"   ||
-        k == K":"   ||
-        k == K".."  ||
-        k == K"$"   ||
-        k == K"::"  ||
+        k == K"≔" ||
+        k == K"⩴" ||
+        k == K":" ||
+        k == K".." ||
+        k == K"$" ||
+        k == K"::" ||
         k == K"where" ||
-        k == K"."   ||
-        k == K"!"   ||
-        k == K".'"  ||
-        k == K"->"  ||
+        k == K"." ||
+        k == K"!" ||
+        k == K".'" ||
+        k == K"->" ||
         K"¬" <= k <= K"∜"
     )
 end
@@ -179,8 +192,9 @@ const _unicode_ops = let
     ks = _nondot_symbolic_operator_kinds()
     ss = string.(ks)
 
-    ops = Dict{Char, Kind}([first(s)=>k for (k,s) in zip(ks,ss)
-                            if length(s) == 1 && !isascii(s[1])])
+    ops = Dict{Char,Kind}([
+        first(s)=>k for (k, s) in zip(ks, ss) if length(s) == 1 && !isascii(s[1])
+    ])
     for ck in _ops_with_unicode_aliases
         push!(ops, ck)
     end
@@ -225,7 +239,7 @@ end
 
 @inline ishex(c::Char) = isdigit(c) || ('a' <= c <= 'f') || ('A' <= c <= 'F')
 @inline isbinary(c::Char) = c == '0' || c == '1'
-@inline isoctal(c::Char) =  '0' ≤ c ≤ '7'
+@inline isoctal(c::Char) = '0' ≤ c ≤ '7'
 @inline iswhitespace(c::Char) = (isvalid(c) && Base.isspace(c)) || c === '\ufeff'
 
 struct StringState
@@ -243,7 +257,7 @@ Ideally a lexer is stateless but some state is needed here for:
 * Disambiguating cases like x' (adjoint) vs 'x' (character literal)
 * Tokenizing code within string interpolations
 """
-mutable struct Lexer{IO_t <: IO}
+mutable struct Lexer{IO_t<:IO}
     io::IO_t
 
     token_startpos::Int
@@ -279,9 +293,15 @@ function Lexer(io::IO)
             end
         end
     end
-    Lexer(io, position(io),
-                  K"error", Vector{StringState}(),
-                  (c1,c2,c3,c4), (p1,p2,p3,p4), false)
+    Lexer(
+        io,
+        position(io),
+        K"error",
+        Vector{StringState}(),
+        (c1, c2, c3, c4),
+        (p1, p2, p3, p4),
+        false,
+    )
 end
 Lexer(str::AbstractString) = Lexer(IOBuffer(str))
 
@@ -396,7 +416,7 @@ Consumes the next character `c` if either `f::Function(c)` returns true, `c == f
 for `c::Char` or `c in f` otherwise. Returns `true` if a character has been
 consumed and `false` otherwise.
 """
-@inline function accept(l::Lexer, f::Union{Function, Char, Vector{Char}, String})
+@inline function accept(l::Lexer, f::Union{Function,Char,Vector{Char},String})
     c = peekchar(l)
     if isa(f, Function)
         ok = f(c)
@@ -427,7 +447,7 @@ end
 
 Returns a `RawToken` of kind `kind` with contents `str` and starts a new `RawToken`.
 """
-function emit(l::Lexer, kind::Kind, maybe_op=true)
+function emit(l::Lexer, kind::Kind, maybe_op = true)
     suffix = false
     if optakessuffix(kind) && maybe_op
         while isopsuffix(peekchar(l))
@@ -537,10 +557,11 @@ function _next_token(l::Lexer, c)
     elseif (k = get(_unicode_ops, c, K"error")) != K"error"
         return emit(l, k)
     else
-        emit(l,
-            !isvalid(c)          ? K"ErrorInvalidUTF8"   :
-            is_invisible_char(c) ? K"ErrorInvisibleChar" :
-            K"ErrorUnknownCharacter")
+        emit(
+            l,
+            !isvalid(c) ? K"ErrorInvalidUTF8" :
+            is_invisible_char(c) ? K"ErrorInvisibleChar" : K"ErrorUnknownCharacter",
+        )
     end
 end
 
@@ -576,12 +597,12 @@ function lex_string_chunk(l)
         # interpolations?
         c = readchar(l)
         if c == '('
-            l.string_states[end] = StringState(state.triplestr, state.raw, state.delim,
-                                               state.paren_depth + 1)
+            l.string_states[end] =
+                StringState(state.triplestr, state.raw, state.delim, state.paren_depth + 1)
             return emit(l, K"(")
         elseif c == ')'
-            l.string_states[end] = StringState(state.triplestr, state.raw, state.delim,
-                                               state.paren_depth - 1)
+            l.string_states[end] =
+                StringState(state.triplestr, state.raw, state.delim, state.paren_depth - 1)
             return emit(l, K")")
         else
             return _next_token(l, c)
@@ -593,8 +614,8 @@ function lex_string_chunk(l)
         # Interpolated symbol or expression
         if pc == '('
             readchar(l)
-            l.string_states[end] = StringState(state.triplestr, state.raw, state.delim,
-                                               state.paren_depth + 1)
+            l.string_states[end] =
+                StringState(state.triplestr, state.raw, state.delim, state.paren_depth + 1)
             return emit(l, K"(")
         elseif is_identifier_start_char(pc)
             return lex_identifier(l, readchar(l))
@@ -603,7 +624,7 @@ function lex_string_chunk(l)
             # characters and let the parser deal with it.
         end
     elseif l.last_token == K"Identifier" &&
-            !(pc == EOF_CHAR || is_operator_start_char(pc) || is_never_id_char(pc))
+           !(pc == EOF_CHAR || is_operator_start_char(pc) || is_never_id_char(pc))
         # Only allow certain characters after interpolated vars
         # https://github.com/JuliaLang/julia/pull/25234
         readchar(l)
@@ -615,15 +636,15 @@ function lex_string_chunk(l)
         # Start interpolation
         readchar(l)
         return emit(l, K"$")
-    elseif !state.raw && pc == '\\' && (pc2 = dpeekchar(l)[2];
-                                        pc2 == '\r' || pc2 == '\n')
+    elseif !state.raw && pc == '\\' && (pc2 = dpeekchar(l)[2]; pc2 == '\r' || pc2 == '\n')
         # Process escaped newline as whitespace
         readchar(l)
         readchar(l)
         if pc2 == '\r' && peekchar(l) == '\n'
             readchar(l)
         end
-        while (pc = peekchar(l); pc == ' ' || pc == '\t')
+        while
+        (pc = peekchar(l); pc == ' ' || pc == '\t')
             readchar(l)
         end
         return emit(l, K"Whitespace")
@@ -637,16 +658,19 @@ function lex_string_chunk(l)
         pop!(l.string_states)
         readchar(l)
         if state.triplestr
-            readchar(l); readchar(l)
-            return emit(l, state.delim == '"' ?
-                        K"\"\"\"" : K"```")
+            readchar(l);
+            readchar(l)
+            return emit(l, state.delim == '"' ? K"\"\"\"" : K"```")
         else
-            return emit(l, state.delim == '"' ? K"\"" :
-                           state.delim == '`' ? K"`"  : K"'", false)
+            return emit(
+                l,
+                state.delim == '"' ? K"\"" : state.delim == '`' ? K"`" : K"'",
+                false,
+            )
         end
     end
     # Read a chunk of string characters
-    init_bidi_state = (0,0)
+    init_bidi_state = (0, 0)
     bidi_state = init_bidi_state
     valid = true
     if state.raw
@@ -717,12 +741,12 @@ function lex_string_chunk(l)
             valid &= isvalid(c)
         end
     end
-    outk = !valid                        ? K"ErrorInvalidUTF8"    :
-           state.delim == '\''           ? K"Char"                :
-           bidi_state != init_bidi_state ? K"ErrorBidiFormatting" :
-           state.delim == '"'            ? K"String"              :
-           state.delim == '`'            ? K"CmdString"           :
-           (@assert(state.delim in KSet"' \" `"); K"error")
+    outk =
+        !valid ? K"ErrorInvalidUTF8" :
+        state.delim == '\'' ? K"Char" :
+        bidi_state != init_bidi_state ? K"ErrorBidiFormatting" :
+        state.delim == '"' ? K"String" :
+        state.delim == '`' ? K"CmdString" : (@assert(state.delim in KSet"' \" `"); K"error")
     return emit(l, outk)
 end
 
@@ -736,7 +760,7 @@ function lex_whitespace(l::Lexer, c)
         pc, ppc = dpeekchar(l)
         # stop on non whitespace and limit to a single newline in a token
         if !iswhitespace(pc) ||
-                (k == K"NewlineWs" && (pc == '\n' || (pc == '\r' && ppc == '\n')))
+           (k == K"NewlineWs" && (pc == '\n' || (pc == '\r' && ppc == '\n')))
             break
         end
         c = readchar(l)
@@ -757,7 +781,7 @@ function lex_comment(l::Lexer)
         end
     else
         c = readchar(l) # consume the '='
-        init_bidi_state = (0,0)
+        init_bidi_state = (0, 0)
         bidi_state = init_bidi_state
         skip = true  # true => c was part of the prev comment marker pair
         nesting = 1
@@ -779,9 +803,10 @@ function lex_comment(l::Lexer)
                     nesting -= 1
                     skip = true
                     if nesting == 0
-                        outk = !valid ? K"ErrorInvalidUTF8" :
-                               bidi_state != init_bidi_state ? K"ErrorBidiFormatting" :
-                               K"Comment"
+                        outk =
+                            !valid ? K"ErrorInvalidUTF8" :
+                            bidi_state != init_bidi_state ? K"ErrorBidiFormatting" :
+                            K"Comment"
                         return emit(l, outk)
                     end
                 end
@@ -829,7 +854,8 @@ function lex_less(l::Lexer)
     elseif accept(l, '|')
         return emit(l, K"<|")
     elseif dpeekchar(l) == ('-', '-')
-        readchar(l); readchar(l)
+        readchar(l);
+        readchar(l)
         if accept(l, '-')
             return emit(l, K"ErrorInvalidOperator")
         else
@@ -984,7 +1010,7 @@ end
 # A digit has been consumed
 function lex_digit(l::Lexer, kind)
     accept_number(l, isdigit)
-    pc,ppc = dpeekchar(l)
+    pc, ppc = dpeekchar(l)
     if pc == '.'
         if ppc == '.'
             # Number followed by K".." or K"..."
@@ -1003,12 +1029,13 @@ function lex_digit(l::Lexer, kind)
         accept(l, '_') && return emit(l, K"ErrorInvalidNumericConstant") # `1._`
         had_fraction_digs = accept_number(l, isdigit)
         pc, ppc = dpeekchar(l)
-        if (pc == 'e' || pc == 'E' || pc == 'f') && (isdigit(ppc) || ppc == '+' || ppc == '-' || ppc == '−')
+        if (pc == 'e' || pc == 'E' || pc == 'f') &&
+           (isdigit(ppc) || ppc == '+' || ppc == '-' || ppc == '−')
             kind = pc == 'f' ? K"Float32" : K"Float"
             readchar(l)
             accept(l, "+-−")
             if accept_batch(l, isdigit)
-                pc,ppc = dpeekchar(l)
+                pc, ppc = dpeekchar(l)
                 if pc === '.' && !is_dottable_operator_start_char(ppc)
                     readchar(l)
                     return emit(l, K"ErrorInvalidNumericConstant") # `1.e1.`
@@ -1019,17 +1046,24 @@ function lex_digit(l::Lexer, kind)
         elseif pc == '.' && ppc != '.' && !is_dottable_operator_start_char(ppc)
             readchar(l)
             return emit(l, K"ErrorInvalidNumericConstant") # `1.1.`
-        elseif !had_fraction_digs && (is_identifier_start_char(pc) ||
-                                      pc == '(' || pc == '[' || pc == '{' ||
-                                      pc == '@' || pc == '`' || pc == '"')
+        elseif !had_fraction_digs && (
+            is_identifier_start_char(pc) ||
+            pc == '(' ||
+            pc == '[' ||
+            pc == '{' ||
+            pc == '@' ||
+            pc == '`' ||
+            pc == '"'
+        )
             return emit(l, K"ErrorAmbiguousNumericDotMultiply") # `1.(` `1.x`
         end
-    elseif (pc == 'e' || pc == 'E' || pc == 'f') && (isdigit(ppc) || ppc == '+' || ppc == '-' || ppc == '−')
+    elseif (pc == 'e' || pc == 'E' || pc == 'f') &&
+           (isdigit(ppc) || ppc == '+' || ppc == '-' || ppc == '−')
         kind = pc == 'f' ? K"Float32" : K"Float"
         readchar(l)
         accept(l, "+-−")
         if accept_batch(l, isdigit)
-            pc,ppc = dpeekchar(l)
+            pc, ppc = dpeekchar(l)
             if pc === '.' && !is_dottable_operator_start_char(ppc)
                 accept(l, '.')
                 return emit(l, K"ErrorInvalidNumericConstant") # `1e1.`
@@ -1045,7 +1079,7 @@ function lex_digit(l::Lexer, kind)
             isfloat = false
             readchar(l)
             had_digits = accept_number(l, ishex)
-            pc,ppc = dpeekchar(l)
+            pc, ppc = dpeekchar(l)
             if pc == '.' && ppc != '.'
                 readchar(l)
                 had_digits |= accept_number(l, ishex)
@@ -1086,16 +1120,16 @@ function lex_digit(l::Lexer, kind)
 end
 
 function lex_prime(l)
-    if l.last_token == K"Identifier"         ||
-         is_contextual_keyword(l.last_token) ||
-         is_word_operator(l.last_token)      ||
-         l.last_token == K"."                ||
-         l.last_token ==  K")"               ||
-         l.last_token ==  K"]"               ||
-         l.last_token ==  K"}"               ||
-         l.last_token == K"'"                ||
-         l.last_token == K"end"              ||
-         is_literal(l.last_token)
+    if l.last_token == K"Identifier" ||
+       is_contextual_keyword(l.last_token) ||
+       is_word_operator(l.last_token) ||
+       l.last_token == K"." ||
+       l.last_token == K")" ||
+       l.last_token == K"]" ||
+       l.last_token == K"}" ||
+       l.last_token == K"'" ||
+       l.last_token == K"end" ||
+       is_literal(l.last_token)
         # FIXME ^ This doesn't cover all cases - probably needs involvement
         # from the parser state.
         return emit(l, K"'")
@@ -1118,9 +1152,10 @@ end
 # Parse a token starting with a quote.
 # A '"' has been consumed
 function lex_quote(l::Lexer)
-    raw = l.last_token == K"Identifier" ||
-          is_contextual_keyword(l.last_token) ||
-          is_word_operator(l.last_token)
+    raw =
+        l.last_token == K"Identifier" ||
+        is_contextual_keyword(l.last_token) ||
+        is_word_operator(l.last_token)
     pc, dpc = dpeekchar(l)
     triplestr = pc == '"' && dpc == '"'
     push!(l.string_states, StringState(triplestr, raw, '"', 0))
@@ -1185,7 +1220,7 @@ function lex_dot(l::Lexer)
             l.dotop = true
             readchar(l)
             return lex_plus(l)
-        elseif pc =='-'
+        elseif pc == '-'
             l.dotop = true
             readchar(l)
             return lex_minus(l)
@@ -1193,31 +1228,31 @@ function lex_dot(l::Lexer)
             l.dotop = true
             readchar(l)
             return emit(l, accept(l, '=') ? K"-=" : K"-")
-        elseif pc =='*'
+        elseif pc == '*'
             l.dotop = true
             readchar(l)
             return lex_star(l)
-        elseif pc =='/'
+        elseif pc == '/'
             l.dotop = true
             readchar(l)
             return lex_forwardslash(l)
-        elseif pc =='\\'
+        elseif pc == '\\'
             l.dotop = true
             readchar(l)
             return lex_backslash(l)
-        elseif pc =='^'
+        elseif pc == '^'
             l.dotop = true
             readchar(l)
             return lex_circumflex(l)
-        elseif pc =='<'
+        elseif pc == '<'
             l.dotop = true
             readchar(l)
             return lex_less(l)
-        elseif pc =='>'
+        elseif pc == '>'
             l.dotop = true
             readchar(l)
             return lex_greater(l)
-        elseif pc =='&'
+        elseif pc == '&'
             l.dotop = true
             readchar(l)
             if accept(l, '=')
@@ -1228,7 +1263,7 @@ function lex_dot(l::Lexer)
                 end
                 return emit(l, K"&")
             end
-        elseif pc =='%'
+        elseif pc == '%'
             l.dotop = true
             readchar(l)
             return lex_percent(l)
@@ -1324,48 +1359,47 @@ function simple_hash(str)
 end
 
 kws = [
-K"baremodule",
-K"begin",
-K"break",
-K"catch",
-K"const",
-K"continue",
-K"do",
-K"else",
-K"elseif",
-K"end",
-K"export",
-K"finally",
-K"for",
-K"function",
-K"global",
-K"if",
-K"import",
-K"let",
-K"local",
-K"macro",
-K"module",
-K"public",
-K"quote",
-K"return",
-K"struct",
-K"try",
-K"using",
-K"while",
-K"in",
-K"isa",
-K"where",
-K"true",
-K"false",
-
-K"abstract",
-K"as",
-K"doc",
-K"mutable",
-K"outer",
-K"primitive",
-K"type",
-K"var",
+    K"baremodule",
+    K"begin",
+    K"break",
+    K"catch",
+    K"const",
+    K"continue",
+    K"do",
+    K"else",
+    K"elseif",
+    K"end",
+    K"export",
+    K"finally",
+    K"for",
+    K"function",
+    K"global",
+    K"if",
+    K"import",
+    K"let",
+    K"local",
+    K"macro",
+    K"module",
+    K"public",
+    K"quote",
+    K"return",
+    K"struct",
+    K"try",
+    K"using",
+    K"while",
+    K"in",
+    K"isa",
+    K"where",
+    K"true",
+    K"false",
+    K"abstract",
+    K"as",
+    K"doc",
+    K"mutable",
+    K"outer",
+    K"primitive",
+    K"type",
+    K"var",
 ]
 
 const kw_hash = Dict(simple_hash(lowercase(string(kw))) => kw for kw in kws)

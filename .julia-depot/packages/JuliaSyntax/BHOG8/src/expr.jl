@@ -23,14 +23,18 @@ end
 
 macro isexpr(ex, head, nargs)
     ex isa Symbol || error("First argument to `@isexpr` must be a variable name")
-    :($(esc(ex)) isa Expr &&
-      $(esc(ex)).head == $(esc(head)) &&
-      length($(esc(ex)).args) == $(esc(nargs)))
+    :(
+        $(esc(ex)) isa Expr &&
+        $(esc(ex)).head == $(esc(head)) &&
+        length($(esc(ex)).args) == $(esc(nargs))
+    )
 end
 
 function is_eventually_call(ex)
-    return ex isa Expr && (ex.head === :call ||
-        (ex.head === :where || ex.head === :(::)) && is_eventually_call(ex.args[1]))
+    return ex isa Expr && (
+        ex.head === :call ||
+        (ex.head === :where || ex.head === :(::)) && is_eventually_call(ex.args[1])
+    )
 end
 
 function _reorder_parameters!(args::Vector{Any}, params_pos)
@@ -46,7 +50,7 @@ function _reorder_parameters!(args::Vector{Any}, params_pos)
         return
     end
     # nest frankentuples parameters sections
-    for i = length(args)-1:-1:p
+    for i = (length(args)-1):-1:p
         pushfirst!((args[i]::Expr).args, pop!(args))
     end
     # Move parameters to args[params_pos]
@@ -75,9 +79,8 @@ function _leaf_to_Expr(source, txtbuf, head, srcrange, node)
     elseif k == K"MacroName" && view(source, srcrange) == "."
         return Symbol("@__dot__")
     elseif is_error(k)
-        return k == K"error" ?
-            Expr(:error) :
-            Expr(:error, "$(_token_error_descriptions[k]): `$(source[srcrange])`")
+        return k == K"error" ? Expr(:error) :
+               Expr(:error, "$(_token_error_descriptions[k]): `$(source[srcrange])`")
     else
         val = isnothing(node) ? parse_julia_literal(txtbuf, head, srcrange) : node.val
         if val isa Union{Int128,UInt128,BigInt}
@@ -85,9 +88,9 @@ function _leaf_to_Expr(source, txtbuf, head, srcrange, node)
             # symbolic/textural form for compatibility with the Expr
             # representation of these.
             str = replace(source[srcrange], '_'=>"")
-            macname = val isa Int128  ? Symbol("@int128_str")  :
-                      val isa UInt128 ? Symbol("@uint128_str") :
-                      Symbol("@big_str")
+            macname =
+                val isa Int128 ? Symbol("@int128_str") :
+                val isa UInt128 ? Symbol("@uint128_str") : Symbol("@big_str")
             return Expr(:macrocall, GlobalRef(Core, macname), nothing, str)
         else
             return val
@@ -149,24 +152,25 @@ end
 # affects the child layout.
 function _fixup_Expr_children!(head, loc, args)
     k = kind(head)
-    eq_to_kw_in_call = ((k == K"call" || k == K"dotcall") &&
-                        is_prefix_call(head)) || k == K"ref"
-    eq_to_kw_in_params = k != K"vect"   && k != K"curly" &&
-                         k != K"braces" && k != K"ref"
-    coalesce_dot = k in KSet"call dotcall curly" ||
-                   (k == K"quote" && flags(head) == COLON_QUOTE)
-    for i in 1:length(args)
+    eq_to_kw_in_call =
+        ((k == K"call" || k == K"dotcall") && is_prefix_call(head)) || k == K"ref"
+    eq_to_kw_in_params = k != K"vect" && k != K"curly" && k != K"braces" && k != K"ref"
+    coalesce_dot =
+        k in KSet"call dotcall curly" || (k == K"quote" && flags(head) == COLON_QUOTE)
+    for i = 1:length(args)
         arg = args[i]
         was_parens = @isexpr(arg, :parens)
         arg = _strip_parens(arg)
-        if @isexpr(arg, :(=)) && eq_to_kw_in_call && i > 1 
+        if @isexpr(arg, :(=)) && eq_to_kw_in_call && i > 1
             arg = Expr(:kw, arg.args...)
         elseif k != K"parens" && @isexpr(arg, :., 1) && arg.args[1] isa Tuple
             h, a = arg.args[1]::Tuple{SyntaxHead,Any}
-            arg = ((!was_parens && coalesce_dot && i == 1) ||
-                   (k == K"comparison" && iseven(i)) ||
-                   is_syntactic_operator(h)) ?
-                Symbol(".", a) : Expr(:., a)
+            arg =
+                (
+                    (!was_parens && coalesce_dot && i == 1) ||
+                    (k == K"comparison" && iseven(i)) ||
+                    is_syntactic_operator(h)
+                ) ? Symbol(".", a) : Expr(:., a)
         elseif @isexpr(arg, :parameters) && eq_to_kw_in_params
             pargs = arg.args
             for j = 1:length(pargs)
@@ -200,10 +204,9 @@ function _internal_node_to_Expr(source, srcrange, head, childranges, childheads,
 
     _fixup_Expr_children!(head, loc, args)
 
-    headstr = untokenize(head, include_flag_suff=false)
-    headsym = !isnothing(headstr) ?
-              Symbol(headstr) :
-              error("Can't untokenize head of kind $(k)")
+    headstr = untokenize(head, include_flag_suff = false)
+    headsym =
+        !isnothing(headstr) ? Symbol(headstr) : error("Can't untokenize head of kind $(k)")
 
     if k == K"?"
         headsym = :if
@@ -303,7 +306,7 @@ function _internal_node_to_Expr(source, srcrange, head, childranges, childheads,
         catch_ = false
         else_ = false
         finally_ = false
-        for i in 2:length(args)
+        for i = 2:length(args)
             a = args[i]
             if @isexpr(a, :catch)
                 catch_var = a.args[1]
@@ -462,9 +465,14 @@ struct _BuildExprStackEntry
     ex::Any
 end
 
-function build_tree(::Type{Expr}, stream::ParseStream;
-                    filename=nothing, first_line=1, kws...)
-    source = SourceFile(stream, filename=filename, first_line=first_line)
+function build_tree(
+    ::Type{Expr},
+    stream::ParseStream;
+    filename = nothing,
+    first_line = 1,
+    kws...,
+)
+    source = SourceFile(stream, filename = filename, first_line = first_line)
     txtbuf = unsafe_textbuf(stream)
     args = Any[]
     childranges = UnitRange{Int}[]
@@ -480,17 +488,24 @@ function build_tree(::Type{Expr}, stream::ParseStream;
             resize!(childranges, length(nodechildren))
             resize!(childheads, length(nodechildren))
             resize!(args, length(nodechildren))
-            for (i,c) in enumerate(nodechildren)
+            for (i, c) in enumerate(nodechildren)
                 childranges[i] = c.srcrange
                 childheads[i] = c.head
                 args[i] = c.ex
             end
-            ex = _internal_node_to_Expr(source, srcrange, head, childranges, childheads, args)
+            ex = _internal_node_to_Expr(
+                source,
+                srcrange,
+                head,
+                childranges,
+                childheads,
+                args,
+            )
         end
         return _BuildExprStackEntry(srcrange, head, ex)
     end
     loc = source_location(LineNumberNode, source, first(entry.srcrange))
-    only(_fixup_Expr_children!(SyntaxHead(K"None",EMPTY_FLAGS), loc, Any[entry.ex]))
+    only(_fixup_Expr_children!(SyntaxHead(K"None", EMPTY_FLAGS), loc, Any[entry.ex]))
 end
 
 function _to_expr(node::SyntaxNode)
@@ -500,12 +515,18 @@ function _to_expr(node::SyntaxNode)
     end
     cs = children(node)
     args = Any[_to_expr(c) for c in cs]
-    _internal_node_to_Expr(node.source, range(node), head(node), range.(cs), head.(cs), args)
+    _internal_node_to_Expr(
+        node.source,
+        range(node),
+        head(node),
+        range.(cs),
+        head.(cs),
+        args,
+    )
 end
 
 function Base.Expr(node::SyntaxNode)
     ex = _to_expr(node)
     loc = source_location(LineNumberNode, node.source, first(range(node)))
-    only(_fixup_Expr_children!(SyntaxHead(K"None",EMPTY_FLAGS), loc, Any[ex]))
+    only(_fixup_Expr_children!(SyntaxHead(K"None", EMPTY_FLAGS), loc, Any[ex]))
 end
-

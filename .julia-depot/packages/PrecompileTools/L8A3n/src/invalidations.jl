@@ -48,7 +48,8 @@ function invalidation_leaves(invlist)
                     i += 2
                     continue
                 end
-                if nextitem ∈ ("jl_method_table_disable", "jl_method_table_insert", "verify_methods")
+                if nextitem ∈
+                   ("jl_method_table_disable", "jl_method_table_insert", "verify_methods")
                     cachequeued(nothing, 0)
                     push!(umis, item)
                 end

@@ -29,17 +29,17 @@ struct Diagnostic
     message::String
 end
 
-function Diagnostic(first_byte, last_byte; error=nothing, warning=nothing)
-    message = !isnothing(error)   ? error :
-              !isnothing(warning) ? warning :
-              Base.error("No message in diagnostic")
+function Diagnostic(first_byte, last_byte; error = nothing, warning = nothing)
+    message =
+        !isnothing(error) ? error :
+        !isnothing(warning) ? warning : Base.error("No message in diagnostic")
     level = !isnothing(error) ? :error : :warning
     Diagnostic(first_byte, last_byte, level, message)
 end
 
 first_byte(d::Diagnostic) = d.first_byte
-last_byte(d::Diagnostic)  = d.last_byte
-is_error(d::Diagnostic)   = d.level === :error
+last_byte(d::Diagnostic) = d.last_byte
+is_error(d::Diagnostic) = d.level === :error
 Base.range(d::Diagnostic) = first_byte(d):last_byte(d)
 
 # Make relative path into a file URL
@@ -67,10 +67,10 @@ function _file_url(filename)
 end
 
 function show_diagnostic(io::IO, diagnostic::Diagnostic, source::SourceFile)
-    color,prefix = diagnostic.level === :error   ? (:light_red, "Error")      :
-                   diagnostic.level === :warning ? (:light_yellow, "Warning") :
-                   diagnostic.level === :note    ? (:light_blue, "Note")      :
-                   (:normal, "Info")
+    color, prefix =
+        diagnostic.level === :error ? (:light_red, "Error") :
+        diagnostic.level === :warning ? (:light_yellow, "Warning") :
+        diagnostic.level === :note ? (:light_blue, "Note") : (:normal, "Info")
     line, col = source_location(source, first_byte(diagnostic))
     linecol = "$line:$col"
     filename = source.filename
@@ -86,15 +86,25 @@ function show_diagnostic(io::IO, diagnostic::Diagnostic, source::SourceFile)
     else
         locstr = "line $linecol"
     end
-    _printstyled(io, "# $prefix @ ", fgcolor=:light_black)
-    _printstyled(io, "$locstr", fgcolor=:light_black, href=file_href)
+    _printstyled(io, "# $prefix @ ", fgcolor = :light_black)
+    _printstyled(io, "$locstr", fgcolor = :light_black, href = file_href)
     print(io, "\n")
-    highlight(io, source, range(diagnostic),
-              note=diagnostic.message, notecolor=color,
-              context_lines_before=1, context_lines_after=0)
+    highlight(
+        io,
+        source,
+        range(diagnostic),
+        note = diagnostic.message,
+        notecolor = color,
+        context_lines_before = 1,
+        context_lines_after = 0,
+    )
 end
 
-function show_diagnostics(io::IO, diagnostics::AbstractVector{Diagnostic}, source::SourceFile)
+function show_diagnostics(
+    io::IO,
+    diagnostics::AbstractVector{Diagnostic},
+    source::SourceFile,
+)
     first = true
     for d in diagnostics
         first || println(io)
@@ -103,7 +113,11 @@ function show_diagnostics(io::IO, diagnostics::AbstractVector{Diagnostic}, sourc
     end
 end
 
-function show_diagnostics(io::IO, diagnostics::AbstractVector{Diagnostic}, text::AbstractString)
+function show_diagnostics(
+    io::IO,
+    diagnostics::AbstractVector{Diagnostic},
+    text::AbstractString,
+)
     show_diagnostics(io, diagnostics, SourceFile(text))
 end
 
