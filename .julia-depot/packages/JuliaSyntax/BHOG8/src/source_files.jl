@@ -23,8 +23,12 @@ struct SourceFile
     line_starts::Vector{Int}
 end
 
-function SourceFile(code::AbstractString; filename=nothing, first_line=1,
-                    first_index=1)
+function SourceFile(
+    code::AbstractString;
+    filename = nothing,
+    first_line = 1,
+    first_index = 1,
+)
     line_starts = Int[1]
     for i in eachindex(code)
         # The line is considered to start after the `\n`
@@ -37,7 +41,7 @@ function SourceFile(code::AbstractString; filename=nothing, first_line=1,
 end
 
 function SourceFile(; filename, kwargs...)
-    SourceFile(read(filename, String); filename=filename, kwargs...)
+    SourceFile(read(filename, String); filename = filename, kwargs...)
 end
 
 # Get line number of the given byte within the code
@@ -71,18 +75,23 @@ end
 Get byte range of the source line at byte_index, buffered by
 `context_lines_before` and `context_lines_after` before and after.
 """
-function source_line_range(source::SourceFile, byte_index;
-                           context_lines_before=0, context_lines_after=0)
+function source_line_range(
+    source::SourceFile,
+    byte_index;
+    context_lines_before = 0,
+    context_lines_after = 0,
+)
     lineidx = _source_line_index(source, byte_index)
     fbyte = source.line_starts[max(lineidx-context_lines_before, 1)]
     lbyte = source.line_starts[min(lineidx+1+context_lines_after, end)] - 1
-    return (fbyte + source.byte_offset,
-            lbyte + source.byte_offset)
+    return (fbyte + source.byte_offset, lbyte + source.byte_offset)
 end
 
 function source_location(::Type{LineNumberNode}, source::SourceFile, byte_index)
-    LineNumberNode(source_line(source, byte_index),
-                   isnothing(source.filename) ? nothing : Symbol(source.filename))
+    LineNumberNode(
+        source_line(source, byte_index),
+        isnothing(source.filename) ? nothing : Symbol(source.filename),
+    )
 end
 
 function Base.show(io::IO, ::MIME"text/plain", source::SourceFile)
@@ -93,7 +102,7 @@ function Base.show(io::IO, ::MIME"text/plain", source::SourceFile)
     if !get(io, :limit, false) || length(source.line_starts) <= heightlim
         print(io, source.code)
     else
-        r1 = source_line_range(source, 1, context_lines_after=heightlim-3)
+        r1 = source_line_range(source, 1, context_lines_after = heightlim-3)
         print(io, view(source, r1[1]:r1[2]))
         println(io, "⋮")
     end
@@ -117,7 +126,7 @@ function Base.view(source::SourceFile, rng::AbstractUnitRange)
 end
 
 function Base.getindex(source::SourceFile, i::Int)
-    source.code[i - source.byte_offset]
+    source.code[i-source.byte_offset]
 end
 
 function Base.thisind(source::SourceFile, i::Int)
@@ -129,7 +138,7 @@ function Base.nextind(source::SourceFile, i::Integer)
 end
 
 Base.firstindex(source::SourceFile) = firstindex(source.code) + source.byte_offset
-Base.lastindex(source::SourceFile)  = lastindex(source.code)  + source.byte_offset
+Base.lastindex(source::SourceFile) = lastindex(source.code) + source.byte_offset
 
 """
     sourcetext(source::SourceFile)
@@ -143,8 +152,16 @@ end
 
 #-------------------------------------------------------------------------------
 # Tools for highlighting source ranges
-function _print_marker_line(io, prefix_str, str, underline, singleline, color,
-                            note, notecolor)
+function _print_marker_line(
+    io,
+    prefix_str,
+    str,
+    underline,
+    singleline,
+    color,
+    note,
+    notecolor,
+)
     # Whitespace equivalent in length to `prefix_str`
     # Getting exactly the same width of whitespace as `str` is tricky.
     # Especially for mixtures of tabs and spaces.
@@ -154,33 +171,31 @@ function _print_marker_line(io, prefix_str, str, underline, singleline, color,
     # Assume tabs are 4 wide rather than 0. (fixme: implement tab alignment?)
     w = textwidth(str) + 4*count(c->c=='\t', str)
     if !isempty(indent)
-        indent = "#" * (first(indent) == '\t' ? indent : indent[nextind(indent,1):end])
+        indent = "#" * (first(indent) == '\t' ? indent : indent[nextind(indent, 1):end])
     end
 
     midchar = '─'
-    startstr, endstr, singlestart = underline ? ("└","┘","╙") : ("┌","┐","╓")
+    startstr, endstr, singlestart = underline ? ("└", "┘", "╙") : ("┌", "┐", "╓")
 
-    markline =
-    if singleline
-        w == 0 ? string(indent, startstr)    :
+    markline = if singleline
+        w == 0 ? string(indent, startstr) :
         w == 1 ? string(indent, singlestart) :
-                 string(indent, startstr, repeat('─', w-2), endstr)
+        string(indent, startstr, repeat('─', w-2), endstr)
     else
         if underline && isempty(indent) && w > 1
-             string('#', repeat('─', w-2), endstr)
+            string('#', repeat('─', w-2), endstr)
         else
-            s,e = underline ? ("", endstr) : (startstr, "")
-            w == 0 ? string(indent, s, e) :
-                     string(indent, s, repeat('─', w-1), e)
+            s, e = underline ? ("", endstr) : (startstr, "")
+            w == 0 ? string(indent, s, e) : string(indent, s, repeat('─', w-1), e)
         end
     end
     if note isa AbstractString
         markline *= " ── "
     end
-    _printstyled(io, markline; fgcolor=color)
+    _printstyled(io, markline; fgcolor = color)
     if !isnothing(note)
         if note isa AbstractString
-            _printstyled(io, note, fgcolor=notecolor)
+            _printstyled(io, note, fgcolor = notecolor)
         else
             note(io, indent, w)
         end
@@ -191,22 +206,35 @@ end
 Print the lines of source code surrounding the given byte `range`, which is
 highlighted with background `color` and markers in the text.
 """
-function highlight(io::IO, source::SourceFile, range::UnitRange;
-                   color=(120,70,70), context_lines_before=2,
-                   context_lines_inner=1, context_lines_after=2,
-                   note=nothing, notecolor=nothing)
+function highlight(
+    io::IO,
+    source::SourceFile,
+    range::UnitRange;
+    color = (120, 70, 70),
+    context_lines_before = 2,
+    context_lines_inner = 1,
+    context_lines_after = 2,
+    note = nothing,
+    notecolor = nothing,
+)
     p = first(range)
     q = last(range)
 
-    x,y = source_line_range(source, p;
-                            context_lines_before=context_lines_before,
-                            context_lines_after=context_lines_inner)
-    a,b = source_line_range(source, p)
+    x, y = source_line_range(
+        source,
+        p;
+        context_lines_before = context_lines_before,
+        context_lines_after = context_lines_inner,
+    )
+    a, b = source_line_range(source, p)
     q1 = max(q, p) # Ignore q for empty ranges
-    c,d = source_line_range(source, q1)
-    z,w = source_line_range(source, q1;
-                            context_lines_before=context_lines_inner,
-                            context_lines_after=context_lines_after)
+    c, d = source_line_range(source, q1)
+    z, w = source_line_range(
+        source,
+        q1;
+        context_lines_before = context_lines_inner,
+        context_lines_after = context_lines_after,
+    )
 
     p_line = source_line(source, p)
     q_line = source_line(source, q)
@@ -220,14 +248,23 @@ function highlight(io::IO, source::SourceFile, range::UnitRange;
         # -----------------w
 
         hitext = source[p:q]
-        print(io, source[x:p-1])
-        _printstyled(io, hitext; bgcolor=color)
+        print(io, source[x:(p-1)])
+        _printstyled(io, hitext; bgcolor = color)
         #print(io, source[q+1:d])
-        print(io, source[nextind(source,q):d])
+        print(io, source[nextind(source, q):d])
         if d >= firstindex(source) && source[thisind(source, d)] != '\n'
             print(io, "\n")
         end
-        _print_marker_line(io, source[a:p-1], hitext, true, true, marker_line_color, note, notecolor)
+        _print_marker_line(
+            io,
+            source[a:(p-1)],
+            hitext,
+            true,
+            true,
+            marker_line_color,
+            note,
+            notecolor,
+        )
     else
         # x   --------------
         # #   ┌─────
@@ -239,20 +276,29 @@ function highlight(io::IO, source::SourceFile, range::UnitRange;
         # #───────────┘ ── note
         # -----------------w
 
-        prefix1 = source[a:p-1]
-        print(io, source[x:a-1])
-        _print_marker_line(io, prefix1, source[p:b], false, false, marker_line_color, nothing, notecolor)
+        prefix1 = source[a:(p-1)]
+        print(io, source[x:(a-1)])
+        _print_marker_line(
+            io,
+            prefix1,
+            source[p:b],
+            false,
+            false,
+            marker_line_color,
+            nothing,
+            notecolor,
+        )
         print(io, '\n')
         print(io, prefix1)
         if q_line - p_line - 1 <= 2*context_lines_inner
             # The diagnostic range is compact and we show the whole thing
-            _printstyled(io, source[p:q]; bgcolor=color)
+            _printstyled(io, source[p:q]; bgcolor = color)
         else
             # Or large and we trucate the code to show only the region around the
             # start and end of the error.
-            _printstyled(io, source[p:y]; bgcolor=color)
+            _printstyled(io, source[p:y]; bgcolor = color)
             print(io, "⋮\n")
-            _printstyled(io, source[z:q]; bgcolor=color)
+            _printstyled(io, source[z:q]; bgcolor = color)
         end
         print(io, source[nextind(source, q):d])
         source[thisind(source, d)] == '\n' || print(io, "\n")
@@ -262,6 +308,6 @@ function highlight(io::IO, source::SourceFile, range::UnitRange;
     if context_lines_after > 0 && d+1 <= lastindex(source)
         print(io, '\n')
         w1 = source[thisind(source, w)] == '\n' ? w - 1 : w
-        print(io, source[d+1:w1])
+        print(io, source[(d+1):w1])
     end
 end

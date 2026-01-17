@@ -10,9 +10,11 @@ mutable struct TreeNode{NodeData}   # ? prevent others from using this with Node
 
     # Use this constructor rather than the automatically generated one to pass
     # Test.detect_unbound_args() test in Base.
-    function TreeNode{NodeData}(parent::Union{Nothing,TreeNode{NodeData}},
-                                children::Union{Nothing,Vector{TreeNode{NodeData}}},
-                                data::Union{Nothing,NodeData}) where {NodeData}
+    function TreeNode{NodeData}(
+        parent::Union{Nothing,TreeNode{NodeData}},
+        children::Union{Nothing,Vector{TreeNode{NodeData}}},
+        data::Union{Nothing,NodeData},
+    ) where {NodeData}
         new{NodeData}(parent, children, data)
     end
 end
@@ -53,8 +55,12 @@ text by calling one of the parser API functions such as [`parseall`](@ref)
 """
 const SyntaxNode = TreeNode{SyntaxData}
 
-function SyntaxNode(source::SourceFile, raw::GreenNode{SyntaxHead};
-                    keep_parens=false, position::Integer=1)
+function SyntaxNode(
+    source::SourceFile,
+    raw::GreenNode{SyntaxHead};
+    keep_parens = false,
+    position::Integer = 1,
+)
     GC.@preserve source begin
         raw_offset, txtbuf = _unsafe_wrap_substring(source.code)
         offset = raw_offset - source.byte_offset
@@ -62,22 +68,30 @@ function SyntaxNode(source::SourceFile, raw::GreenNode{SyntaxHead};
     end
 end
 
-function _to_SyntaxNode(source::SourceFile, txtbuf::Vector{UInt8}, offset::Int,
-                        raw::GreenNode{SyntaxHead},
-                        position::Int, keep_parens::Bool)
+function _to_SyntaxNode(
+    source::SourceFile,
+    txtbuf::Vector{UInt8},
+    offset::Int,
+    raw::GreenNode{SyntaxHead},
+    position::Int,
+    keep_parens::Bool,
+)
     if !haschildren(raw)
         # Here we parse the values eagerly rather than representing them as
         # strings. Maybe this is good. Maybe not.
-        valrange = position:position + span(raw) - 1
+        valrange = position:(position+span(raw)-1)
         val = parse_julia_literal(txtbuf, head(raw), valrange .+ offset)
         return SyntaxNode(nothing, nothing, SyntaxData(source, raw, position, val))
     else
         cs = SyntaxNode[]
         pos = position
-        for (i,rawchild) in enumerate(children(raw))
+        for (i, rawchild) in enumerate(children(raw))
             # FIXME: Allowing trivia is_error nodes here corrupts the tree layout.
             if !is_trivia(rawchild) || is_error(rawchild)
-                push!(cs, _to_SyntaxNode(source, txtbuf, offset, rawchild, pos, keep_parens))
+                push!(
+                    cs,
+                    _to_SyntaxNode(source, txtbuf, offset, rawchild, pos, keep_parens),
+                )
             end
             pos += Int(rawchild.span)
         end
@@ -110,7 +124,7 @@ head(node::AbstractSyntaxNode) = head(node.raw)
 span(node::AbstractSyntaxNode) = span(node.raw)
 
 first_byte(node::AbstractSyntaxNode) = node.position
-last_byte(node::AbstractSyntaxNode)  = node.position + span(node) - 1
+last_byte(node::AbstractSyntaxNode) = node.position + span(node) - 1
 
 """
     sourcetext(node)
@@ -133,8 +147,13 @@ function interpolate_literal(node::SyntaxNode, val)
     SyntaxNode(node.source, node.raw, node.position, node.parent, true, val)
 end
 
-function _show_syntax_node(io, current_filename, node::AbstractSyntaxNode,
-                           indent, show_byte_offsets)
+function _show_syntax_node(
+    io,
+    current_filename,
+    node::AbstractSyntaxNode,
+    indent,
+    show_byte_offsets,
+)
     fname = node.source.filename
     line, col = source_location(node.source, node.position)
     posstr = "$(lpad(line, 4)):$(rpad(col,3))│"
@@ -142,8 +161,9 @@ function _show_syntax_node(io, current_filename, node::AbstractSyntaxNode,
         posstr *= "$(lpad(first_byte(node),6)):$(rpad(last_byte(node),6))│"
     end
     val = node.val
-    nodestr = haschildren(node) ? "[$(untokenize(head(node)))]" :
-              isa(val, Symbol) ? string(val) : repr(val)
+    nodestr =
+        haschildren(node) ? "[$(untokenize(head(node)))]" :
+        isa(val, Symbol) ? string(val) : repr(val)
     treestr = string(indent, nodestr)
     # Add filename if it's changed from the previous node
     if fname != current_filename[]
@@ -180,8 +200,16 @@ function _show_syntax_node_sexpr(io, node::AbstractSyntaxNode)
     end
 end
 
-function Base.show(io::IO, ::MIME"text/plain", node::AbstractSyntaxNode; show_byte_offsets=false)
-    println(io, "line:col│$(show_byte_offsets ? " byte_range  │" : "") tree                                   │ file_name")
+function Base.show(
+    io::IO,
+    ::MIME"text/plain",
+    node::AbstractSyntaxNode;
+    show_byte_offsets = false,
+)
+    println(
+        io,
+        "line:col│$(show_byte_offsets ? " byte_range  │" : "") tree                                   │ file_name",
+    )
     _show_syntax_node(io, Ref{Union{Nothing,String}}(nothing), node, "", show_byte_offsets)
 end
 
@@ -193,7 +221,7 @@ function Base.show(io::IO, node::AbstractSyntaxNode)
     _show_syntax_node_sexpr(io, node)
 end
 
-function Base.push!(node::SN, child::SN) where SN<:AbstractSyntaxNode
+function Base.push!(node::SN, child::SN) where {SN<:AbstractSyntaxNode}
     if !haschildren(node)
         error("Cannot add children")
     end
@@ -204,7 +232,8 @@ end
 function Base.copy(node::TreeNode)
     # copy the container but not the data (ie, deep copy the tree, shallow copy the data). copy(::Expr) is similar
     # copy "un-parents" the top-level `node` that you're copying
-    newnode = typeof(node)(nothing, haschildren(node) ? typeof(node)[] : nothing, copy(node.data))
+    newnode =
+        typeof(node)(nothing, haschildren(node) ? typeof(node)[] : nothing, copy(node.data))
     for child in children(node)
         newchild = copy(child)
         newchild.parent = newnode
@@ -216,11 +245,17 @@ end
 # shallow-copy the data
 Base.copy(data::SyntaxData) = SyntaxData(data.source, data.raw, data.position, data.val)
 
-function build_tree(::Type{SyntaxNode}, stream::ParseStream;
-                    filename=nothing, first_line=1, keep_parens=false, kws...)
+function build_tree(
+    ::Type{SyntaxNode},
+    stream::ParseStream;
+    filename = nothing,
+    first_line = 1,
+    keep_parens = false,
+    kws...,
+)
     green_tree = build_tree(GreenNode, stream; kws...)
-    source = SourceFile(stream, filename=filename, first_line=first_line)
-    SyntaxNode(source, green_tree, position=first_byte(stream), keep_parens=keep_parens)
+    source = SourceFile(stream, filename = filename, first_line = first_line)
+    SyntaxNode(source, green_tree, position = first_byte(stream), keep_parens = keep_parens)
 end
 
 #-------------------------------------------------------------------------------
@@ -241,7 +276,7 @@ function child(node, path::Integer...)
 end
 
 function setchild!(node::SyntaxNode, path, x)
-    n1 = child(node, path[1:end-1]...)
+    n1 = child(node, path[1:(end-1)]...)
     n1.children[path[end]] = x
 end
 
@@ -273,7 +308,7 @@ function child_position_span(node::GreenNode, path::Int...)
     p = 1
     for index in path
         cs = children(n)
-        for i = 1:index-1
+        for i = 1:(index-1)
             p += span(cs[i])
         end
         n = cs[index]

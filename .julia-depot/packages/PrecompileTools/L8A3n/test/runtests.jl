@@ -4,14 +4,15 @@ using Pkg
 using UUIDs
 
 @testset "PrecompileTools.jl" begin
-    specializations(m::Method) = isdefined(Base, :specializations) ? Base.specializations(m) : m.specializations
+    specializations(m::Method) =
+        isdefined(Base, :specializations) ? Base.specializations(m) : m.specializations
 
     push!(LOAD_PATH, @__DIR__)
 
     using PC_A
     if VERSION >= v"1.8"
         # Check that calls inside @setup_workload are not precompiled
-        m = which(Tuple{typeof(Base.vect), Vararg{T}} where T)
+        m = which(Tuple{typeof(Base.vect),Vararg{T}} where {T})
         have_mytype = false
         for mi in specializations(m)
             mi === nothing && continue
@@ -30,7 +31,7 @@ using UUIDs
         end
         @test count == 1
         # Even one that was runtime-dispatched
-        m = which(Tuple{typeof(findfirst), Base.Fix2{typeof(==), T}, Vector{T}} where T)
+        m = which(Tuple{typeof(findfirst),Base.Fix2{typeof(==),T},Vector{T}} where {T})
         count = 0
         for mi in specializations(m)
             mi === nothing && continue
@@ -69,10 +70,18 @@ using UUIDs
         using PC_D
 
         PrecompileTools.Preferences.set_preferences!(PC_D, "precompile_workload" => false)
-        @test success(run(`$(Base.julia_cmd()) --project=$(joinpath(@__DIR__, "PC_D")) -e $script 0`))
+        @test success(
+            run(`$(Base.julia_cmd()) --project=$(joinpath(@__DIR__, "PC_D")) -e $script 0`),
+        )
 
-        PrecompileTools.Preferences.delete_preferences!(PC_D, "precompile_workload"; force = true)
-        @test success(run(`$(Base.julia_cmd()) --project=$(joinpath(@__DIR__, "PC_D")) -e $script 1`))
+        PrecompileTools.Preferences.delete_preferences!(
+            PC_D,
+            "precompile_workload";
+            force = true,
+        )
+        @test success(
+            run(`$(Base.julia_cmd()) --project=$(joinpath(@__DIR__, "PC_D")) -e $script 1`),
+        )
         Pkg.activate(projfile)
     end
 
@@ -108,15 +117,53 @@ using UUIDs
         @test PrecompileTools.invalidation_leaves(invs) == Set([mis[2]])
         invs = Any[mis[1], 0, mis[2], 1, mis[3], 1, Tuple{}, m, "jl_method_table_insert"]
         @test PrecompileTools.invalidation_leaves(invs) == Set([mis[2], mis[3]])
-        invs = Any[mis[1], 0, mis[2], 1, Tuple{}, mis[1], 1, mis[3], "jl_method_table_insert", m, "jl_method_table_insert"]
+        invs = Any[
+            mis[1],
+            0,
+            mis[2],
+            1,
+            Tuple{},
+            mis[1],
+            1,
+            mis[3],
+            "jl_method_table_insert",
+            m,
+            "jl_method_table_insert",
+        ]
         @test PrecompileTools.invalidation_leaves(invs) == Set(mis[1:3])
-        invs = Any[mis[1], 1, mis[2], "jl_method_table_disable", m, "jl_method_table_disable"]
+        invs =
+            Any[mis[1], 1, mis[2], "jl_method_table_disable", m, "jl_method_table_disable"]
         @test PrecompileTools.invalidation_leaves(invs) == Set([mis[1], mis[2]])
-        invs = Any[mis[1], 1, mis[2], "jl_method_table_disable", mis[3], "jl_method_table_insert", m]
+        invs = Any[
+            mis[1],
+            1,
+            mis[2],
+            "jl_method_table_disable",
+            mis[3],
+            "jl_method_table_insert",
+            m,
+        ]
         @test Set([mis[1], mis[2]]) ⊆ PrecompileTools.invalidation_leaves(invs)
-        invs = Any[mis[1], 1, mis[2], "jl_method_table_insert", mis[2], "invalidate_mt_cache", m, "jl_method_table_insert"]
+        invs = Any[
+            mis[1],
+            1,
+            mis[2],
+            "jl_method_table_insert",
+            mis[2],
+            "invalidate_mt_cache",
+            m,
+            "jl_method_table_insert",
+        ]
         @test PrecompileTools.invalidation_leaves(invs) == Set([mis[1], mis[2]])
-        invs = Any[Tuple{}, "insert_backedges_callee", 55, Any[m], mis[2], "verify_methods", 55]
+        invs = Any[
+            Tuple{},
+            "insert_backedges_callee",
+            55,
+            Any[m],
+            mis[2],
+            "verify_methods",
+            55,
+        ]
         @test PrecompileTools.invalidation_leaves(invs) == Set([mis[2]])
 
         # Add a real invalidation & repair test
@@ -124,53 +171,65 @@ using UUIDs
         mktempdir() do dir
             push!(LOAD_PATH, dir)
             cd(dir) do
-                for ((pkg1, pkg2, pkg3), recompile) in ((("RC_A", "RC_B", "RC_C"), false,),
-                                                        (("RC_D", "RC_E", "RC_F"), true))
+                for ((pkg1, pkg2, pkg3), recompile) in
+                    ((("RC_A", "RC_B", "RC_C"), false), (("RC_D", "RC_E", "RC_F"), true))
                     Pkg.generate(pkg1)
                     open(joinpath(dir, pkg1, "src", pkg1*".jl"), "w") do io
-                        println(io, """
-                        module $pkg1
-                        nbits(::Int8) = 8
-                        nbits(::Int16) = 16
-                        call_nbits(c) = nbits(only(c))
-                        begin
-                            Base.Experimental.@force_compile
-                            call_nbits(Any[Int8(5)])
-                        end
-                        end
-                        """)
+                        println(
+                            io,
+                            """
+                module $pkg1
+                nbits(::Int8) = 8
+                nbits(::Int16) = 16
+                call_nbits(c) = nbits(only(c))
+                begin
+                    Base.Experimental.@force_compile
+                    call_nbits(Any[Int8(5)])
+                end
+                end
+                """,
+                        )
                     end
                     Pkg.generate(pkg2)
                     Pkg.activate(joinpath(dir, pkg2))
-                    Pkg.develop(PackageSpec(path=joinpath(dir, pkg1)))
+                    Pkg.develop(PackageSpec(path = joinpath(dir, pkg1)))
                     open(joinpath(dir, pkg2, "src", pkg2*".jl"), "w") do io
-                        println(io, """
-                        module $pkg2
-                        using $pkg1
-                        $(pkg1).nbits(::Int32) = 32
-                        end
-                        """)
+                        println(
+                            io,
+                            """
+                module $pkg2
+                using $pkg1
+                $(pkg1).nbits(::Int32) = 32
+                end
+                """,
+                        )
                     end
                     # pkg3 is like a "Startup" package that recompiles the invalidations from loading the "code universe"
                     Pkg.generate(pkg3)
                     Pkg.activate(joinpath(dir, pkg3))
-                    Pkg.develop(PackageSpec(path=joinpath(dir, pkg2)))
-                    Pkg.develop(PackageSpec(path=dirname(@__DIR__)))   # depend on PrecompileTools
+                    Pkg.develop(PackageSpec(path = joinpath(dir, pkg2)))
+                    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))   # depend on PrecompileTools
                     open(joinpath(dir, pkg3, "src", pkg3*".jl"), "w") do io
                         if recompile
-                            println(io, """
-                            module $pkg3
-                            using PrecompileTools
-                            @recompile_invalidations using $pkg2
-                            end
-                            """)
+                            println(
+                                io,
+                                """
+                    module $pkg3
+                    using PrecompileTools
+                    @recompile_invalidations using $pkg2
+                    end
+                    """,
+                            )
                         else
-                            println(io, """
-                            module $pkg3
-                            using PrecompileTools
-                            using $pkg2
-                            end
-                            """)
+                            println(
+                                io,
+                                """
+                    module $pkg3
+                    using PrecompileTools
+                    using $pkg2
+                    end
+                    """,
+                            )
                         end
                     end
 

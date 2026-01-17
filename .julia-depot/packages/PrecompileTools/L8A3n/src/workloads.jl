@@ -69,7 +69,10 @@ macro compile_workload(ex::Expr)
     local iscompiling = if Base.VERSION < v"1.6"
         :(ccall(:jl_generating_output, Cint, ()) == 1)
     else
-        :((ccall(:jl_generating_output, Cint, ()) == 1 && $PrecompileTools.workload_enabled(@__MODULE__)))
+        :((
+            ccall(:jl_generating_output, Cint, ()) == 1 &&
+            $PrecompileTools.workload_enabled(@__MODULE__)
+        ))
     end
     if have_force_compile
         ex = quote
@@ -81,7 +84,8 @@ macro compile_workload(ex::Expr)
     else
         # Use the hack on earlier Julia versions that blocks the interpreter
         ex = quote
-            while false end
+            while false
+            end
             $(esc(ex))
         end
     end
@@ -131,7 +135,10 @@ macro setup_workload(ex::Expr)
     local iscompiling = if Base.VERSION < v"1.6"
         :(ccall(:jl_generating_output, Cint, ()) == 1)
     else
-        :((ccall(:jl_generating_output, Cint, ()) == 1 && $PrecompileTools.workload_enabled(@__MODULE__)))
+        :((
+            ccall(:jl_generating_output, Cint, ()) == 1 &&
+            $PrecompileTools.workload_enabled(@__MODULE__)
+        ))
     end
     # Ideally we'd like a `let` around this to prevent namespace pollution, but that seem to
     # trigger inference & codegen in undesirable ways (see #16).

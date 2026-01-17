@@ -153,9 +153,9 @@ function process_emphasis(parser::InlineParser, stack_bottom)
                     opener.numdelims -= use_delims
                     closer.numdelims -= use_delims
                     opener_inl.literal =
-                        opener_inl.literal[1:length(opener_inl.literal)-use_delims]
+                        opener_inl.literal[1:(length(opener_inl.literal)-use_delims)]
                     closer_inl.literal =
-                        closer_inl.literal[1:length(closer_inl.literal)-use_delims]
+                        closer_inl.literal[1:(length(closer_inl.literal)-use_delims)]
 
                     # Build contents for new Emph or Strong element.
                     emph = use_delims == 1 ? Node(Emph()) : Node(Strong())

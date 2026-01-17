@@ -50,7 +50,7 @@ function setext_heading(parser::Parser, container::Node)
                 if pos == 0
                     break
                 end
-                container.literal = container.literal[pos+1:end]
+                container.literal = container.literal[(pos+1):end]
             end
             if !isempty(container.literal)
                 heading = Node(Heading(), container.sourcepos)

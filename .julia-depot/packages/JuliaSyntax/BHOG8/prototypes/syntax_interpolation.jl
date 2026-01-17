@@ -31,7 +31,7 @@ function at_show2(ex::SyntaxNode)
     # The following emulates the expression interpolation lowering which is
     # usually done by the compiler.
     # 1. Extract the expression literal as `block`
-    tree = parseall(SyntaxNode, String(read(@__FILE__)), filename=@__FILE__)
+    tree = parseall(SyntaxNode, String(read(@__FILE__)), filename = @__FILE__)
     block = child(tree, 3, 2, 2, 1)
     # 2. Interpolate local variables into the block at positions of $'s
     # Interpolating a SyntaxNode `ex` is simple:
@@ -39,8 +39,7 @@ function at_show2(ex::SyntaxNode)
     # The interpolation of a Julia *value* should inherit the source location
     # of the $ interpolation expression. This is different to when substituting
     # in a SyntaxNode which should just be inserted as-is.
-    setchild!(block, (2, 2),
-              JuliaSyntax.interpolate_literal(child(block, 2, 2), name))
+    setchild!(block, (2, 2), JuliaSyntax.interpolate_literal(child(block, 2, 2), name))
     block
 end
 
@@ -48,7 +47,7 @@ end
 
 # Let's have some simple expression to pass to at_show2. This will be
 # attributed to a different file foo.jl
-s2 = parseall(SyntaxNode, "foo +\n42", filename="foo.jl", rule=:statement)
+s2 = parseall(SyntaxNode, "foo +\n42", filename = "foo.jl", rule = :statement)
 
 # Calling at_show2, we see that the precise source information is preserved for
 # both the surrounding expression and the interpolated fragments.

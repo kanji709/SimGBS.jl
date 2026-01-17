@@ -43,8 +43,10 @@ if VERSION < v"1.6"
 end
 
 function toks(str)
-    ts = [JuliaSyntax.Tokenize.untokenize(t, str)=>kind(t)
-          for t in JuliaSyntax.Tokenize.tokenize(str)]
+    ts = [
+        JuliaSyntax.Tokenize.untokenize(t, str)=>kind(t) for
+        t in JuliaSyntax.Tokenize.tokenize(str)
+    ]
     @test ts[end] == (""=>K"EndMarker")
     pop!(ts)
     ts
@@ -78,8 +80,7 @@ function triple_string_roughly_equal(fl_str, str)
         return false
     end
     has_whitespace_only_line =
-        any(!isempty(fl_line) && all(c in " \t" for c in fl_line)
-            for fl_line in fl_lines)
+        any(!isempty(fl_line) && all(c in " \t" for c in fl_line) for fl_line in fl_lines)
     if !has_whitespace_only_line
         return str == fl_str
     end
@@ -98,10 +99,11 @@ end
 # Compare Expr from reference parser expression to JuliaSyntax parser, ignoring
 # differences due to bugs in the reference parser.
 function exprs_roughly_equal(fl_ex, ex)
-    if fl_ex isa Float64 && Meta.isexpr(ex, :call, 3) &&
-                            ex.args[1] == :* &&
-                            ex.args[2] == fl_ex &&
-                            (ex.args[3] == :f || ex.args[3] == :f0)
+    if fl_ex isa Float64 &&
+       Meta.isexpr(ex, :call, 3) &&
+       ex.args[1] == :* &&
+       ex.args[2] == fl_ex &&
+       (ex.args[3] == :f || ex.args[3] == :f0)
         # 0x1p0f
         return true
     elseif !(fl_ex isa Expr) || !(ex isa Expr)
@@ -116,17 +118,21 @@ function exprs_roughly_equal(fl_ex, ex)
         end
     end
     # Ignore differences in line number nodes within block-like constructs
-    fl_args = fl_ex.head in (:block, :quote, :toplevel) ?
-              filter(x->!(x isa LineNumberNode), fl_ex.args) :
-              fl_ex.args
-    args = ex.head in (:block, :quote, :toplevel) ?
-           filter(x->!(x isa LineNumberNode), ex.args) :
-           ex.args
-    if (fl_ex.head == :block && ex.head == :tuple && 
-        length(fl_args) == 2 && length(args) == 2 &&
+    fl_args =
+        fl_ex.head in (:block, :quote, :toplevel) ?
+        filter(x->!(x isa LineNumberNode), fl_ex.args) : fl_ex.args
+    args =
+        ex.head in (:block, :quote, :toplevel) ?
+        filter(x->!(x isa LineNumberNode), ex.args) : ex.args
+    if (
+        fl_ex.head == :block &&
+        ex.head == :tuple &&
+        length(fl_args) == 2 &&
+        length(args) == 2 &&
         Meta.isexpr(args[1], :parameters, 1) &&
         exprs_roughly_equal(fl_args[2], args[1].args[1]) &&
-        exprs_roughly_equal(fl_args[1], args[2]))
+        exprs_roughly_equal(fl_args[1], args[2])
+    )
         # Allow `(a; b,)`:
         # * Reference parser produces a block
         # * New parser produces a frankentuple
@@ -149,7 +155,7 @@ function exprs_roughly_equal(fl_ex, ex)
     elseif h == :for
         iterspec = args[1]
         if JuliaSyntax.is_eventually_call(iterspec.args[1]) &&
-                Meta.isexpr(iterspec.args[2], :block)
+           Meta.isexpr(iterspec.args[2], :block)
             blk = iterspec.args[2]
             if length(blk.args) == 2 && blk.args[1] isa LineNumberNode
                 # Ignore short form function location differences in
@@ -188,10 +194,11 @@ function parsers_agree_on_file(filename; kws...)
     parsers_agree_on_file(text, filename; kws...)
 end
 
-function parsers_agree_on_file(text, filename; exprs_equal=exprs_equal_no_linenum)
-    fl_ex = fl_parseall(text, filename=filename)
-    if Meta.isexpr(fl_ex, :toplevel) && !isempty(fl_ex.args) &&
-            Meta.isexpr(fl_ex.args[end], (:error, :incomplete))
+function parsers_agree_on_file(text, filename; exprs_equal = exprs_equal_no_linenum)
+    fl_ex = fl_parseall(text, filename = filename)
+    if Meta.isexpr(fl_ex, :toplevel) &&
+       !isempty(fl_ex.args) &&
+       Meta.isexpr(fl_ex.args[end], (:error, :incomplete))
         # Reference parser failed. This generally indicates a broken file not a
         # parser problem, so ignore this case.
         return true
@@ -199,7 +206,7 @@ function parsers_agree_on_file(text, filename; exprs_equal=exprs_equal_no_linenu
     try
         stream = ParseStream(text)
         parse!(stream)
-        ex = build_tree(Expr, stream, filename=filename)
+        ex = build_tree(Expr, stream, filename = filename)
         return !JuliaSyntax.any_error(stream) && exprs_equal(fl_ex, ex)
     catch exc
         @error "Parsing failed" filename exception=current_exceptions()
@@ -210,8 +217,13 @@ end
 function find_source_in_path(basedir)
     src_list = String[]
     for (root, dirs, files) in walkdir(basedir)
-        append!(src_list, (joinpath(root, f) for f in files
-                           if endswith(f, ".jl") && (p = joinpath(root,f); !islink(p) && isfile(p))))
+        append!(
+            src_list,
+            (
+                joinpath(root, f) for f in files if
+                endswith(f, ".jl") && (p = joinpath(root, f); !islink(p) && isfile(p))
+            ),
+        )
     end
     src_list
 end
@@ -233,11 +245,10 @@ function test_parse_all_in_path(compare_for_path::Function, basedir)
                 # ignore this case.
                 continue
             end
-            parsers_agree = parsers_agree_on_file(text, filepath, exprs_equal=cmp)
+            parsers_agree = parsers_agree_on_file(text, filepath, exprs_equal = cmp)
             @test parsers_agree
             if !parsers_agree
-                reduced_failures = reduce_text.(reduce_tree(text),
-                                                parsers_fuzzy_disagree)
+                reduced_failures = reduce_text.(reduce_tree(text), parsers_fuzzy_disagree)
                 @test reduced_failures == []
             end
         end
@@ -253,17 +264,19 @@ function equals_flisp_parse(exprs_equal, tree)
     node_text = sourcetext(tree)
     # Reparse with JuliaSyntax. This is a crude way to ensure we're not missing
     # some context from the parent node.
-    fl_ex = fl_parseall(node_text, filename="none")
-    if Meta.isexpr(fl_ex, :error) || (Meta.isexpr(fl_ex, :toplevel) &&
-                                      length(fl_ex.args) >= 1 &&
-                                      Meta.isexpr(fl_ex.args[end], :error))
+    fl_ex = fl_parseall(node_text, filename = "none")
+    if Meta.isexpr(fl_ex, :error) || (
+        Meta.isexpr(fl_ex, :toplevel) &&
+        length(fl_ex.args) >= 1 &&
+        Meta.isexpr(fl_ex.args[end], :error)
+    )
         return true # Something went wrong in reduction; ignore these cases 😬
     end
-    ex = parseall(Expr, node_text, filename="none", ignore_errors=true)
+    ex = parseall(Expr, node_text, filename = "none", ignore_errors = true)
     exprs_equal(fl_ex, ex)
 end
 
-function _reduce_tree(failing_subtrees, tree; exprs_equal=exprs_equal_no_linenum)
+function _reduce_tree(failing_subtrees, tree; exprs_equal = exprs_equal_no_linenum)
     if equals_flisp_parse(exprs_equal, tree)
         return false
     end
@@ -277,7 +290,8 @@ function _reduce_tree(failing_subtrees, tree; exprs_equal=exprs_equal_no_linenum
             if is_trivia(child) || !haschildren(child)
                 continue
             end
-            had_failing_subtrees |= _reduce_tree(failing_subtrees, child; exprs_equal=exprs_equal)
+            had_failing_subtrees |=
+                _reduce_tree(failing_subtrees, child; exprs_equal = exprs_equal)
         end
     end
     if !had_failing_subtrees
@@ -315,7 +329,7 @@ end
 # Text-based test case reduction
 function parser_throws_exception(text)
     try
-        JuliaSyntax.parseall(JuliaSyntax.SyntaxNode, text, ignore_errors=true)
+        JuliaSyntax.parseall(JuliaSyntax.SyntaxNode, text, ignore_errors = true)
         false
     catch
         true
@@ -323,14 +337,16 @@ function parser_throws_exception(text)
 end
 
 function parsers_fuzzy_disagree(text::AbstractString)
-    fl_ex = fl_parseall(text, filename="none")
-    if Meta.isexpr(fl_ex, (:error,:incomplete)) ||
-            (Meta.isexpr(fl_ex, :toplevel) && length(fl_ex.args) >= 1 &&
-             Meta.isexpr(fl_ex.args[end], (:error,:incomplete)))
+    fl_ex = fl_parseall(text, filename = "none")
+    if Meta.isexpr(fl_ex, (:error, :incomplete)) || (
+        Meta.isexpr(fl_ex, :toplevel) &&
+        length(fl_ex.args) >= 1 &&
+        Meta.isexpr(fl_ex.args[end], (:error, :incomplete))
+    )
         return false
     end
     try
-        ex = parseall(Expr, text, filename="none", ignore_errors=true)
+        ex = parseall(Expr, text, filename = "none", ignore_errors = true)
         return !exprs_roughly_equal(fl_ex, ex)
     catch
         @error "Reduction failed" text
@@ -360,7 +376,7 @@ function reduce_text(str, parse_differs)
             chunklen = clamp(length(str)÷10, 1, 10)
             reduced = false
             for i = 1:100
-                m = thisind(str, rand(1:length(str)-chunklen))
+                m = thisind(str, rand(1:(length(str)-chunklen)))
                 m3 = nextind(str, m+chunklen)
                 if m3 == nextind(str, m)
                     continue
@@ -379,8 +395,8 @@ function reduce_text(str, parse_differs)
     end
 end
 
-function show_green_tree(code; version::VersionNumber=v"1.6")
-    t = JuliaSyntax.parseall(GreenNode, code, version=version)
+function show_green_tree(code; version::VersionNumber = v"1.6")
+    t = JuliaSyntax.parseall(GreenNode, code, version = version)
     sprint(show, MIME"text/plain"(), t, code)
 end
 
@@ -396,7 +412,7 @@ function parse_sexpr(code)
             bump(st, TRIVIA_FLAG)
         elseif k == K")"
             if isempty(pos_stack)
-                bump(st, error="Mismatched `)` with no opening `(`")
+                bump(st, error = "Mismatched `)` with no opening `(`")
                 break
             else
                 bump(st, TRIVIA_FLAG)
@@ -408,11 +424,11 @@ function parse_sexpr(code)
             bump(st, TRIVIA_FLAG)
         elseif k == K"EndMarker"
             if !isempty(pos_stack)
-                bump_invisible(st, K"error", error="Mismatched `)`")
+                bump_invisible(st, K"error", error = "Mismatched `)`")
             end
             break
         else
-            bump(st, error="Unexpected token")
+            bump(st, error = "Unexpected token")
         end
     end
     if JuliaSyntax.any_error(st)
@@ -426,8 +442,13 @@ end
 # Tools copied from Base.Meta which call core_parser_hook as if called by
 # Meta.parse(), but without installing the global hook.
 
-function _Meta_parse_string(text::AbstractString, filename::AbstractString,
-                            lineno::Integer, index::Integer, options)
+function _Meta_parse_string(
+    text::AbstractString,
+    filename::AbstractString,
+    lineno::Integer,
+    index::Integer,
+    options,
+)
     if index < 1 || index > ncodeunits(text) + 1
         throw(BoundsError(text, index))
     end
@@ -435,8 +456,14 @@ function _Meta_parse_string(text::AbstractString, filename::AbstractString,
     ex, offset+1
 end
 
-function Meta_parse(str::AbstractString, pos::Integer;
-               filename="none", greedy::Bool=true, raise::Bool=true, depwarn::Bool=true)
+function Meta_parse(
+    str::AbstractString,
+    pos::Integer;
+    filename = "none",
+    greedy::Bool = true,
+    raise::Bool = true,
+    depwarn::Bool = true,
+)
     ex, pos = _Meta_parse_string(str, String(filename), 1, pos, greedy ? :statement : :atom)
     if raise && Meta.isexpr(ex, :error)
         err = ex.args[1]
@@ -448,9 +475,20 @@ function Meta_parse(str::AbstractString, pos::Integer;
     return ex, pos
 end
 
-function Meta_parse(str::AbstractString;
-                    filename="none", raise::Bool=true, depwarn::Bool=true)
-    ex, pos = Meta_parse(str, 1; filename=filename, greedy=true, raise=raise, depwarn=depwarn)
+function Meta_parse(
+    str::AbstractString;
+    filename = "none",
+    raise::Bool = true,
+    depwarn::Bool = true,
+)
+    ex, pos = Meta_parse(
+        str,
+        1;
+        filename = filename,
+        greedy = true,
+        raise = raise,
+        depwarn = depwarn,
+    )
     if Meta.isexpr(ex, :error)
         return ex
     end
@@ -461,12 +499,11 @@ function Meta_parse(str::AbstractString;
     return ex
 end
 
-function Meta_parseatom(text::AbstractString, pos::Integer; filename="none", lineno=1)
+function Meta_parseatom(text::AbstractString, pos::Integer; filename = "none", lineno = 1)
     return _Meta_parse_string(text, String(filename), lineno, pos, :atom)
 end
 
-function Meta_parseall(text::AbstractString; filename="none", lineno=1)
-    ex,_ = _Meta_parse_string(text, String(filename), lineno, 1, :all)
+function Meta_parseall(text::AbstractString; filename = "none", lineno = 1)
+    ex, _ = _Meta_parse_string(text, String(filename), lineno, 1, :all)
     return ex
 end
-

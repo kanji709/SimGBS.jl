@@ -7,27 +7,27 @@ import Base: readdir, show, occursin
 export glob, @fn_str, @fn_mstr, @glob_str, @glob_mstr
 
 @static if VERSION < v"1.7"
-macro something(args...)
-    noth = GlobalRef(Base, :nothing)
-    something = GlobalRef(Base, :something)
-    expr = :($something($noth))
-    for arg in reverse(args)
-        val = gensym()
-        expr = quote
-            $val = $(esc(arg))
-            if $val === $noth
-                $expr
-            else
-                $something($val)
+    macro something(args...)
+        noth = GlobalRef(Base, :nothing)
+        something = GlobalRef(Base, :something)
+        expr = :($something($noth))
+        for arg in reverse(args)
+            val = gensym()
+            expr = quote
+                $val = $(esc(arg))
+                if $val === $noth
+                    $expr
+                else
+                    $something($val)
+                end
             end
         end
+        return expr
     end
-    return expr
-end
 end
 
 const CASELESS = 1 << 0 # i -- Do case-insensitive matching
-const PERIOD   = 1 << 1 # p -- A leading period (.) character must be exactly matched by a period (.) character
+const PERIOD = 1 << 1 # p -- A leading period (.) character must be exactly matched by a period (.) character
 const NOESCAPE = 1 << 2 # e -- Do not treat backslash (\) as a special character
 const PATHNAME = 1 << 3 # d -- Slash (/) character must be exactly matched by a slash (/) character
 const EXTENDED = 1 << 4 # x -- Support extended (bash-like) features
@@ -37,18 +37,18 @@ struct FilenameMatch{S<:AbstractString}
     options::UInt32
     FilenameMatch{S}(pattern, options) where {S} = new{S}(pattern, options)
 end
-function FilenameMatch(pattern::S, options::Integer=0) where {S<:AbstractString}
+function FilenameMatch(pattern::S, options::Integer = 0) where {S<:AbstractString}
     return FilenameMatch{S}(pattern, options)
 end
 function FilenameMatch(pattern::AbstractString, flags::AbstractString)
     options = 0
     for f in flags
-        options |= (f == 'i') ? CASELESS :
-                   (f == 'p') ? PERIOD   :
-                   (f == 'e') ? NOESCAPE :
-                   (f == 'd') ? PATHNAME :
-                   (f == 'x') ? EXTENDED :
-                   error("unknown Filename Matcher flag: $f")
+        options |=
+            (f == 'i') ? CASELESS :
+            (f == 'p') ? PERIOD :
+            (f == 'e') ? NOESCAPE :
+            (f == 'd') ? PATHNAME :
+            (f == 'x') ? EXTENDED : error("unknown Filename Matcher flag: $f")
     end
     return FilenameMatch(pattern, options)
 end
@@ -65,13 +65,17 @@ Returns a `Glob.FilenameMatch` object, which can be used with `ismatch()` or `oc
 * `x` = `EXTENDED` : Additional features borrowed from newer shells, such as `bash` and `tcsh`
     * Backslash (`\``) characters in `[]` groups escape the next character
 """
-macro fn_str(pattern, flags...) FilenameMatch(pattern, flags...) end
-macro fn_mstr(pattern, flags...) FilenameMatch(pattern, flags...) end
+macro fn_str(pattern, flags...)
+    FilenameMatch(pattern, flags...)
+end
+macro fn_mstr(pattern, flags...)
+    FilenameMatch(pattern, flags...)
+end
 
 function show(io::IO, fn::FilenameMatch)
     print(io, "fn\"", fn.pattern, '"')
     (fn.options & CASELESS) != 0 && print(io, 'i')
-    (fn.options & PERIOD  ) != 0 && print(io, 'p')
+    (fn.options & PERIOD) != 0 && print(io, 'p')
     (fn.options & NOESCAPE) != 0 && print(io, 'e')
     (fn.options & PATHNAME) != 0 && print(io, 'd')
     (fn.options & EXTENDED) != 0 && print(io, 'x')
@@ -81,7 +85,7 @@ end
 function occursin(fn::FilenameMatch, s::AbstractString)
     pattern = fn.pattern
     caseless = (fn.options & CASELESS) != 0
-    periodfl = (fn.options & PERIOD  ) != 0
+    periodfl = (fn.options & PERIOD) != 0
     noescape = (fn.options & NOESCAPE) != 0
     pathname = (fn.options & PATHNAME) != 0
     extended = (fn.options & EXTENDED) != 0
@@ -219,7 +223,7 @@ end
 @deprecate ismatch(fn::FilenameMatch, s::AbstractString) occursin(fn, s)
 
 filter!(fn::FilenameMatch, v) = filter!(x -> occursin(fn, x), v)
-filter(fn::FilenameMatch, v)  = filter(x -> occursin(fn, x), v)
+filter(fn::FilenameMatch, v) = filter(x -> occursin(fn, x), v)
 filter!(fn::FilenameMatch, d::Dict) = filter!(((k, _),) -> occursin(fn, k), d)
 filter(fn::FilenameMatch, d::Dict) = filter!(fn, copy(d))
 
@@ -277,12 +281,19 @@ function _match_bracket(pat::AbstractString, mc::Char, i, cl::Char, cu::Char) # 
             elseif phrase == "xdigit"
                 isxdigit(cl)
             else
-                error(string("invalid character expression [:",phrase,":]"))
-            end)
+                error(string("invalid character expression [:", phrase, ":]"))
+            end
+        )
         return (mc, k3, true, match)
     elseif mc2 == '.'
         if j != k0
-            error(string("only single characters are currently supported as collating symbols, got [.", SubString(pat, j, k0), ".]"))
+            error(
+                string(
+                    "only single characters are currently supported as collating symbols, got [.",
+                    SubString(pat, j, k0),
+                    ".]",
+                ),
+            )
             #match = (pat[j:k0] == s[ci:ci+(k0-j)])
             #return (mc, k3, true, match)
         end
@@ -290,7 +301,13 @@ function _match_bracket(pat::AbstractString, mc::Char, i, cl::Char, cu::Char) # 
         return (mc, k3, false, true)
     else #if mc2 == '='
         if j != k0
-            error(string("only single characters are currently supported as character equivalents, got [=", SubString(pat, j, k0), "=]"))
+            error(
+                string(
+                    "only single characters are currently supported as character equivalents, got [=",
+                    SubString(pat, j, k0),
+                    "=]",
+                ),
+            )
         end
         mc, j = something(iterate(pat, j))
         match = (cl==mc) | (cu==mc)
@@ -385,12 +402,18 @@ end
 
 Returns a `Glob.GlobMatch` object, which can be used with `glob()` or `readdir()`.
 """
-macro glob_str(pattern) GlobMatch(pattern) end
-macro glob_mstr(pattern) GlobMatch(pattern) end
+macro glob_str(pattern)
+    GlobMatch(pattern)
+end
+macro glob_mstr(pattern)
+    GlobMatch(pattern)
+end
 
 struct GlobMatch
     pattern::Vector
-    GlobMatch(pattern) = isempty(pattern) ? error("GlobMatch pattern cannot be an empty vector") : new(pattern)
+    GlobMatch(pattern) =
+        isempty(pattern) ? error("GlobMatch pattern cannot be an empty vector") :
+        new(pattern)
 end
 GlobMatch(gm::GlobMatch) = gm
 function GlobMatch(pattern::AbstractString)
@@ -402,7 +425,7 @@ function GlobMatch(pattern::AbstractString)
     if !isconcretetype(S)
         S = Any
     else
-        S = Union{S, FilenameMatch{S}}
+        S = Union{S,FilenameMatch{S}}
     end
     glob = Array{S}(undef, length(pat))
     extended = false
@@ -419,7 +442,7 @@ function GlobMatch(pattern::AbstractString)
                 end
                 next = iterate(p, j)
             elseif (c == '*') | (c == '?') |
-                    (c == '[' && _match(p, j, '\0', false, extended)[2])
+                   (c == '[' && _match(p, j, '\0', false, extended)[2])
                 ispattern = true
                 break
             end
@@ -461,7 +484,7 @@ end
 
 Alias for [`glob()`](@ref).
 """
-readdir(pattern::GlobMatch, prefix::AbstractString="") = glob(pattern, prefix)
+readdir(pattern::GlobMatch, prefix::AbstractString = "") = glob(pattern, prefix)
 
 """
     glob(pattern, [directory::AbstractString])
@@ -489,7 +512,7 @@ A trailing `/` (or equivalently, a trailing empty string in the vector) will cau
 
 Attempting to use a pattern with a leading `/` or the empty string is an error; use the `directory` argument to specify the absolute path to the directory in such a case.
 """
-function glob(pattern, prefix::AbstractString="")
+function glob(pattern, prefix::AbstractString = "")
     matches = String[prefix]
     for pat in GlobMatch(pattern).pattern
         matches = _glob!(matches, pat)
